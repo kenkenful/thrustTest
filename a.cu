@@ -6,35 +6,10 @@
 #include <thrust/sequence.h>
 #include <thrust/gather.h>
 #include <thrust/reduce.h>
+#include <thrust/random.h>
 
 
 cublasHandle_t g_handle;
-
-/*
-template <typename T>
-inline auto trans(thrust::host_vector<T>& mat, std::size_t row_size, std::size_t col_size) {
-    thrust::host_vector<T> ret(col_size * row_size);
-
-    for (auto i = 0; i < col_size; ++i) {
-        for (auto j = 0; j < row_size; ++j) {
-            ret[i * row_size + j] = mat[j * col_size + i];
-        }
-    }
-    return ret;
-}   
-
-template <typename T>
-inline auto trans(thrust::device_vector<T>& mat, std::size_t row_size, std::size_t col_size) {
-    thrust::device_vector<T> ret(col_size * row_size);
-
-    for (auto i = 0; i < col_size; ++i) {
-        for (auto j = 0; j < row_size; ++j) {
-            ret[i * row_size + j] = mat[j * col_size + i];
-        }
-    }
-    return ret;
-}   
-*/
 
 struct transpose_index : public thrust::unary_function<size_t,size_t>
 {
@@ -161,6 +136,14 @@ public:
     }
 
     /* Matrix */
+    CMat(thrust::device_vector<T> &dv, int row, int col){
+        row_ = row;
+        col_ = col;
+        
+        d = dv;
+    }
+
+    /* Matrix */
     CMat(thrust::host_vector<thrust::host_vector<T>> &hvv){
         row_ = hvv.size();
         col_ = hvv[0].size();
@@ -230,6 +213,22 @@ public:
         return d.end();
     }
 
+    auto data(){
+        return d.data();
+
+    }
+
+    void reserve(size_t sz){
+        d.reserve(sz);
+
+    }
+
+    void insert(CMat<T> &b){
+        d.insert(d.end(), b.begin(), b.end());
+
+    }
+
+
     auto operator=(CMat<T> &a){
         if(this == &a) return *this;
         this -> row_ = a.row();
@@ -243,11 +242,6 @@ public:
         int temp = row_;
         row_ = col_;
         col_ = temp;
-    }
-
-
-    auto first_val(){
-        return d[0];
     }
 
 private:
@@ -756,7 +750,7 @@ auto mDot(CMat<T> &a, CMat<T> &&b){
 
 /* vector inner product */
 template<typename T>
-auto vDot(CMat<T> &&a, CMat<T> &&b){
+T vDot(CMat<T> &&a, CMat<T> &&b){
     assert(a.size() == b.size());
     
     CMat<T> s;  /* Scalor */
@@ -785,7 +779,7 @@ auto vDot(CMat<T> &&a, CMat<T> &&b){
 
     }
 
-    T ret = s.first_val();
+    T ret = s.data()[0];
 
     return ret;
 
@@ -860,19 +854,19 @@ auto dot(CMat<T> &&a, bool T1 , CMat<T> &&b, bool T2 ){
         float beta = 0.0;
         cublasSgemm(    
             g_handle,
-            t1, //行列A 転置有無
-            t2, //行列B 転置有無
-            a_row,    // 行列Aの行数
-            b_row,    // 行列Bの列数
-            a_col,    // 行列Aの列数(=行列Ｂの行数)
-            &alpha,     // 行列の積に掛ける値(なければ1)
-            a.get(),    // 行列A
-            a_row,    // 行列Aの行数
-            b.get(),    // 行列B
-            b_row,    // 行列Bの行数
-            &beta,      // 行列Cに掛けるスカラ値(なければ0)
-            ret.get(),  // 行列Cの初期値 兼 出力先
-            ret.row()   // 行列Cの行数
+            t1,             // 行列A 転置有無
+            t2,             // 行列B 転置有無
+            a_row,          // 行列Aの行数
+            b_row,          // 行列Bの列数
+            a_col,          // 行列Aの列数(=行列Ｂの行数)
+            &alpha,         // 行列の積に掛ける値(なければ1)
+            a.get(),        // 行列A
+            a_row,          // 行列Aの行数
+            b.get(),        // 行列B
+            b_row,          // 行列Bの行数
+            &beta,          // 行列Cに掛けるスカラ値(なければ0)
+            ret.get(),      // 行列Cの初期値 兼 出力先
+            ret.row()       // 行列Cの行数
         );
 
     }else if constexpr(std::is_same<T, double>{}){
@@ -880,16 +874,16 @@ auto dot(CMat<T> &&a, bool T1 , CMat<T> &&b, bool T2 ){
             double beta = 0.0;
             cublasDgemm(    
                 g_handle,
-                CUBLAS_OP_N, //行列A 転置有無
-                CUBLAS_OP_N, //行列B 転置有無
-                a_row,     // 行列Aの行数
-                b_row,     // 行列Bの列数
-                a_col,     // 行列Aの列数(=行列Ｂの行数)
+                CUBLAS_OP_N, // 行列A 転置有無
+                CUBLAS_OP_N, // 行列B 転置有無
+                a_row,       // 行列Aの行数
+                b_row,       // 行列Bの列数
+                a_col,       // 行列Aの列数(=行列Ｂの行数)
                 &alpha,      // 行列の積に掛ける値(なければ1)
                 a.get(),     // 行列A
-                a_row,     // 行列Aの行数
+                a_row,       // 行列Aの行数
                 b.get(),     // 行列B
-                b_row,     // 行列Bの行数
+                b_row,       // 行列Bの行数
                 &beta,       // 行列Cに掛けるスカラ値(なければ0)
                 ret.get(),   // 行列Cの初期値 兼 出力先
                 ret.row()    // 行列Cの行数
@@ -1149,14 +1143,46 @@ auto resize(CMat<T> &a, int r, int c){
 
 
 
+struct rm2cm_idx_functor : public thrust::unary_function<int, int>
+{
+  int r;
+  int c;
+
+  rm2cm_idx_functor(int _r, int _c) : r(_r), c(_c) {};
+
+  __host__ __device__
+  int operator() (int idx)  {
+    unsigned my_r = idx/c;
+    unsigned my_c = idx%c;
+    return (my_c * r) + my_r;
+  }
+};
+
+template<typename T>
+void copyMat(thrust::device_ptr<T> src, thrust::device_ptr<T> dst, unsigned src_rows, unsigned src_cols, unsigned dst_rows, unsigned offset){
+   thrust::copy_n(
+                thrust::make_permutation_iterator(src, 
+                thrust::make_transform_iterator(thrust::counting_iterator<int>(0), 
+                rm2cm_idx_functor(src_rows, src_cols))), 
+                src_rows*src_cols, 
+                thrust::make_permutation_iterator(dst, 
+                thrust::make_transform_iterator(thrust::counting_iterator<int>(offset), 
+                rm2cm_idx_functor(dst_rows, src_cols)))
+                );
+}
+
+
 /* Concat Horizon */
 template<typename T>
 auto concatH(CMat<T> &&a, CMat<T> &&b){
     assert(a.row() == b.row());
-    CMat<T> ret(a.row(), a.col() + b.col());
-    thrust::copy(a.begin(), a.end(), ret.begin()); 
-    thrust::copy(b.begin(), b.end(), ret.begin() + a.size()); 
     
+    CMat<T> ret(a);
+
+    ret.reserve(a.size() + b.size());
+    ret.setCol(a.col() + b.col());
+    ret.insert(b);
+   
     return ret;
 }
 
@@ -1184,17 +1210,20 @@ auto concatH(CMat<T> &a, CMat<T> &b){
 
 
 /* Concat Vertical */
+
+
+
 template<typename T>
 auto concatV(CMat<T> &&a, CMat<T> &&b){
     assert(a.col() == b.col());
 
     CMat<T> ret(a.row() + b.row(), a.col());
 
-    for(int i=0; i< a.col(); ++i){
-        thrust::copy(a.begin() + a.row() * i, a.begin() + a.row() * (i + 1), ret.begin() + ret.row() * i );
-        thrust::copy(b.begin() + b.row() * i, b.begin() + b.row() * (i + 1), ret.begin() + ret.row() * i + a.row() ); 
-    }
-    
+    int offset = 0;
+    copyMat(a.data(), ret.data(), a.row(), a.col(), ret.row(), offset);
+    offset = a.col()*a.row();
+    copyMat(b.data(), ret.data(), b.row(), b.col(), ret.row(), offset);
+
     return ret;
 }
 
@@ -1300,13 +1329,45 @@ auto sigmoid(CMat<T> &a){
 /* Summation Vertical direction */
 template <typename T>
 auto sumV(CMat<T> &&a){
-    thrust::device_vector<T> d;
-    for(int i=0; i<a.col();++i){
-        auto x = thrust::reduce(a.begin() + a.row() * i, a.begin()  + a.row() * (i + 1));
-        d.push_back(x);
-    }
 
-    CMat<T> ret(d, VectorType::Col);
+    CMat<T> ret(1, a.col());
+    thrust::device_vector<T> d_ones(a.row(), 1.0);
+
+    T alpha = 1.0;
+    T beta  = 0.0;  
+          
+    if constexpr (std::is_same<T, float>{}) {
+          cublasSgemv(g_handle, 
+                        CUBLAS_OP_T, 
+                        a.row(), 
+                        a.col(), 
+                        &alpha, 
+                        a.get(), 
+                        a.row(), 
+                        thrust::raw_pointer_cast(d_ones.data()), 
+                        1, 
+                        &beta, 
+                        ret.get(), 
+                        1
+                    );
+
+    }
+    else  if constexpr (std::is_same<T, double>{}) {
+          cublasDgemv(g_handle, 
+                        CUBLAS_OP_T, 
+                        a.row(), 
+                        a.col(), 
+                        &alpha, 
+                        a.get(), 
+                        a.row(), 
+                        thrust::raw_pointer_cast(d_ones.data()), 
+                        1, 
+                        &beta, 
+                        ret.get(), 
+                        1
+                    );
+
+    }
 
     return ret;
 
@@ -1322,11 +1383,47 @@ auto sumV(CMat<T> &a){
 /* Summation Horizontal direction */
 template <typename T>
 auto sumH(CMat<T> &&a){
-    CMat<T> ret = sumV(TP(a));
-    ret.trans();
+
+    CMat<T> ret(a.row(), 1);
+    thrust::device_vector<T> d_ones(a.col(), 1.0);
+
+    T alpha = 1.0;
+    T beta  = 0.0;  
+          
+    if constexpr (std::is_same<T, float>{}) {
+          cublasSgemv(g_handle, 
+                        CUBLAS_OP_N, 
+                        a.row(), 
+                        a.col(), 
+                        &alpha, 
+                        a.get(), 
+                        a.row(), 
+                        thrust::raw_pointer_cast(d_ones.data()), 
+                        1, 
+                        &beta, 
+                        ret.get(), 
+                        1
+                    );
+
+    }
+    else if constexpr (std::is_same<T, double>{}) {
+          cublasDgemv(g_handle, 
+                        CUBLAS_OP_N, 
+                        a.row(), 
+                        a.col(), 
+                        &alpha, 
+                        a.get(), 
+                        a.row(), 
+                        thrust::raw_pointer_cast(d_ones.data()), 
+                        1, 
+                        &beta, 
+                        ret.get(), 
+                        1
+                    );
+
+    }
 
     return ret;
-
 }
 
 template <typename T>
@@ -1334,34 +1431,75 @@ auto sumH(CMat<T> &a){
     return sumH(std::move(a));
 }
 
+
+/* RANDOM */
+
+struct GenRand
+{
+    __host__ __device__
+    float operator () (int idx)
+    {
+        thrust::default_random_engine randEng;
+        thrust::uniform_real_distribution<float> uniDist;
+        randEng.discard(idx);
+        return uniDist(randEng);
+    }
+};
+
+template <typename T>
+auto rand(CMat<T> &&a){
+    CMat<T> ret(a);
+ 
+    thrust::transform(
+        thrust::make_counting_iterator(0),
+        thrust::make_counting_iterator(a.size()),
+        ret.begin(),
+        GenRand()
+    );
+
+    return ret;
+}
+
+template <typename T>
+auto rand(CMat<T> &a){
+    return rand(std::move(a));
+}
+
 int main(){
    
-    thrust::host_vector<thrust::host_vector<float>> hh = { //  4,3
-                                                            {1,2,3},
-                                                            {2,2,3},
-                                                            {2,2,3},
-                                                            {2,2,3}
-                                                        };    
-    
-    thrust::host_vector<thrust::host_vector<float>> cc = { // 3,4
-                                                            {-1,2,3,-5},
-                                                            {4,-5,-6,6},
-                                                            {7,8,-9,11}
-                                                        };   
+    thrust::host_vector<thrust::host_vector<float>> x = { //  4,2
+                                                            {0, 2},
+                                                            {1, 2},
+                                                            {0, 3},
+                                                            {1, 4}
+                                                        };
+
+    thrust::host_vector<thrust::host_vector<float>> z = { //  4,2
+                                                            {0, 2},
+                                                            {1, 2},
+                                                            {0, 3},
+                                                            {1, 4}
+                                                        };
 
 
-    thrust::host_vector<float> h = {7,7,7}; 
-    
-    //CMat m1(h);
-    CMat d1(h, VectorType::Row);
-    CMat d2(cc);
-    CMat d3(20, VectorType::Row);
-    CMat d4(hh);
+    thrust::host_vector<float> y = {5,4,0,1};   
+
+    thrust::host_vector<float> w =  {1,1,2,2};   
+    thrust::host_vector<thrust::host_vector<float>> b =  {
+                                                            {0,5,5,0}, 
+                                                            {0,5,5,0}
+                                                            };        
+
+    CMat Dx(x);
+    CMat Dz(z);
+    CMat Dy(y, VectorType::Row);
+
+    CMat Dw(w, VectorType::Row);
+    CMat Db(b);
 
     cublasCreate(&g_handle);
 
-    sumV(d4).print();
-
+    concatH(Dx, Dz).print();
     
     //auto b = concatH(mDot((vDot(d1 ,d1) * d2 - 100.0f), d4),d1);
     //b.print();
