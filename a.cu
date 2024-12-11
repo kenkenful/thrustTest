@@ -68,11 +68,11 @@ enum class VectorType
 };
 
 template<typename T = float>
-class CMat{
+class ThrustMat{
 public:
 
     /* Scalor */
-    CMat(){
+    ThrustMat(){
         this -> row_ = 1;
         this -> col_ = 1;
         d.resize(1, 0);
@@ -80,7 +80,7 @@ public:
     }
 
     /* Vector */
-    CMat(int sz, VectorType type){
+    ThrustMat(int sz, VectorType type){
         if(type == VectorType::Row){
             this -> row_ = sz;
             this -> col_ = 1;    
@@ -94,14 +94,14 @@ public:
 
 
     /* Matrix */
-    CMat(int r, int c){
+    ThrustMat(int r, int c){
         this -> row_ = r;
         this -> col_ = c;
         d.resize(r*c, 0);
     }
 
     /* copy constructor */
-    CMat(CMat &a){
+    ThrustMat(ThrustMat &a){
        // type_ = a.type_;
         row_ = a.row();
         col_ = a.col();
@@ -110,7 +110,7 @@ public:
 
 
     /* Vector */
-    CMat(thrust::host_vector<T> &hv, VectorType type){
+    ThrustMat(thrust::host_vector<T> &hv, VectorType type){
         if(type == VectorType::Row){
             row_ = hv.size();
             col_ = 1;
@@ -123,7 +123,7 @@ public:
     }
 
     /* Vector */
-    CMat(thrust::device_vector<T> &dv, VectorType type){
+    ThrustMat(thrust::device_vector<T> &dv, VectorType type){
         if(type == VectorType::Row){
             row_ = dv.size();
             col_ = 1;
@@ -136,7 +136,7 @@ public:
     }
 
     /* Matrix */
-    CMat(thrust::device_vector<T> &dv, int row, int col){
+    ThrustMat(thrust::device_vector<T> &dv, int row, int col){
         row_ = row;
         col_ = col;
         
@@ -144,7 +144,7 @@ public:
     }
 
     /* Matrix */
-    CMat(thrust::host_vector<thrust::host_vector<T>> &hvv){
+    ThrustMat(thrust::host_vector<thrust::host_vector<T>> &hvv){
         row_ = hvv.size();
         col_ = hvv[0].size();
 
@@ -161,7 +161,7 @@ public:
         d = v;
     }
 
-    ~CMat(){
+    ~ThrustMat(){
     }
 
     T* get(){
@@ -223,13 +223,13 @@ public:
 
     }
 
-    void insert(CMat<T> &b){
+    void insert(ThrustMat<T> &b){
         d.insert(d.end(), b.begin(), b.end());
 
     }
 
 
-    auto operator=(CMat<T> &a){
+    auto operator=(ThrustMat<T> &a){
         if(this == &a) return *this;
         this -> row_ = a.row();
         this -> col_ = a.col();
@@ -254,10 +254,10 @@ private:
 /* add */
 
 template <typename T>
-auto operator+(CMat<T> &&a, CMat<T> &&b){
+auto operator+(ThrustMat<T> &&a, ThrustMat<T> &&b){
     assert(a.size() == b.size());
 
-    CMat<T> ret(b);
+    ThrustMat<T> ret(b);
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::plus<T>());
 
 /*
@@ -285,22 +285,22 @@ auto operator+(CMat<T> &&a, CMat<T> &&b){
 }
 
 template <typename T>
-auto operator+(CMat<T> &a, CMat<T> &b){
-    CMat<T> ret = std::move(a) + std::move(b);
+auto operator+(ThrustMat<T> &a, ThrustMat<T> &b){
+    ThrustMat<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator+(CMat<T> &&a, CMat<T> &b){
-    CMat<T> ret = std::move(a) + std::move(b);
+auto operator+(ThrustMat<T> &&a, ThrustMat<T> &b){
+    ThrustMat<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator+(CMat<T> &a, CMat<T> &&b){
-    CMat<T> ret = std::move(a) + std::move(b);
+auto operator+(ThrustMat<T> &a, ThrustMat<T> &&b){
+    ThrustMat<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
@@ -321,8 +321,8 @@ struct add_s
 };
 
 template <typename T>
-auto operator+(CMat<T> &&a, T b){
-    CMat<T> ret(a);
+auto operator+(ThrustMat<T> &&a, T b){
+    ThrustMat<T> ret(a);
     auto add = add_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), add);
     
@@ -330,14 +330,14 @@ auto operator+(CMat<T> &&a, T b){
 }
 
 template <typename T>
-auto operator+(CMat<T> &a, T b){
-    CMat<T> ret = std::move(a) + b;
+auto operator+(ThrustMat<T> &a, T b){
+    ThrustMat<T> ret = std::move(a) + b;
     return ret;
 }
 
 template <typename T>
-auto operator+(T a, CMat<T> &&b){
-    CMat<T> ret(b);
+auto operator+(T a, ThrustMat<T> &&b){
+    ThrustMat<T> ret(b);
     auto add = add_s<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), add);
     
@@ -345,8 +345,8 @@ auto operator+(T a, CMat<T> &&b){
 }
 
 template <typename T>
-auto operator+(T a, CMat<T> &b){
-    CMat<T> ret = a + std::move(b);
+auto operator+(T a, ThrustMat<T> &b){
+    ThrustMat<T> ret = a + std::move(b);
     return ret;
 }
 
@@ -354,11 +354,11 @@ auto operator+(T a, CMat<T> &b){
 /* sub */
 
 template <typename T>
-auto operator-(CMat<T> &&a, CMat<T> &&b){
+auto operator-(ThrustMat<T> &&a, ThrustMat<T> &&b){
 
     assert(a.size() == b.size());
 
-    CMat<T> ret(b);
+    ThrustMat<T> ret(b);
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::minus<T>());
 
 /*
@@ -386,22 +386,22 @@ auto operator-(CMat<T> &&a, CMat<T> &&b){
 }
 
 template <typename T>
-auto operator-(CMat<T> &a, CMat<T> &b){
-    CMat<T> ret = std::move(a) + std::move(b);
+auto operator-(ThrustMat<T> &a, ThrustMat<T> &b){
+    ThrustMat<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator-(CMat<T> &&a, CMat<T> &b){
-    CMat<T> ret = std::move(a) - std::move(b);
+auto operator-(ThrustMat<T> &&a, ThrustMat<T> &b){
+    ThrustMat<T> ret = std::move(a) - std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator-(CMat<T> &a, CMat<T> &&b){
-    CMat<T> ret = std::move(a) - std::move(b);
+auto operator-(ThrustMat<T> &a, ThrustMat<T> &&b){
+    ThrustMat<T> ret = std::move(a) - std::move(b);
     
     return ret;
 }
@@ -422,8 +422,8 @@ struct sub_s
 };
 
 template <typename T>
-auto operator-(CMat<T> &&a, T b){
-    CMat<T> ret(a);
+auto operator-(ThrustMat<T> &&a, T b){
+    ThrustMat<T> ret(a);
     auto sub = sub_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), sub);
     
@@ -431,8 +431,8 @@ auto operator-(CMat<T> &&a, T b){
 }
 
 template <typename T>
-auto operator-(CMat<T> &a, T b){
-    CMat<T> ret = std::move(a) - b;
+auto operator-(ThrustMat<T> &a, T b){
+    ThrustMat<T> ret = std::move(a) - b;
     return ret;
 }
 
@@ -455,8 +455,8 @@ struct sub_s_2
 
 
 template <typename T>
-auto operator-(T a, CMat<T> &&b){
-    CMat<T> ret(b);
+auto operator-(T a, ThrustMat<T> &&b){
+    ThrustMat<T> ret(b);
     auto sub = sub_s_2<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), sub);
     
@@ -464,17 +464,17 @@ auto operator-(T a, CMat<T> &&b){
 }
 
 template <typename T>
-auto operator-(T a, CMat<T> &b){
-    CMat<T> ret = a - std::move(b);
+auto operator-(T a, ThrustMat<T> &b){
+    ThrustMat<T> ret = a - std::move(b);
     return ret;
 }
 
 /* mul */
 template <typename T>
-auto operator*(CMat<T> &&a, CMat<T> &&b){
+auto operator*(ThrustMat<T> &&a, ThrustMat<T> &&b){
 
     assert(a.size() == b.size());
-    CMat<T> ret(b);
+    ThrustMat<T> ret(b);
 
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::multiplies<T>());
 
@@ -483,27 +483,27 @@ auto operator*(CMat<T> &&a, CMat<T> &&b){
 }
 
 template <typename T>
-auto operator*(CMat<T> &a, CMat<T> &b){
+auto operator*(ThrustMat<T> &a, ThrustMat<T> &b){
 
-    CMat<T> ret = std::move(a) * std::move(b);
-
-    return ret;
-
-}
-
-template <typename T>
-auto operator*(CMat<T> &&a, CMat<T> &b){
-
-    CMat<T> ret = std::move(a) * std::move(b);
+    ThrustMat<T> ret = std::move(a) * std::move(b);
 
     return ret;
 
 }
 
 template <typename T>
-auto operator*(CMat<T> &a, CMat<T> &&b){
+auto operator*(ThrustMat<T> &&a, ThrustMat<T> &b){
 
-    CMat<T> ret = std::move(a) * std::move(b);
+    ThrustMat<T> ret = std::move(a) * std::move(b);
+
+    return ret;
+
+}
+
+template <typename T>
+auto operator*(ThrustMat<T> &a, ThrustMat<T> &&b){
+
+    ThrustMat<T> ret = std::move(a) * std::move(b);
 
     return ret;
 
@@ -525,8 +525,8 @@ struct mul_s
 };
 
 template <typename T>
-auto operator*(CMat<T> &&a, T b){
-    CMat<T> ret(a);
+auto operator*(ThrustMat<T> &&a, T b){
+    ThrustMat<T> ret(a);
     auto mul = mul_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), mul);
     
@@ -534,15 +534,15 @@ auto operator*(CMat<T> &&a, T b){
 }
 
 template <typename T>
-auto operator*(CMat<T> &a, T b){
-    CMat<T> ret = std::move(a) * b;
+auto operator*(ThrustMat<T> &a, T b){
+    ThrustMat<T> ret = std::move(a) * b;
     return ret;
 }
 
 
 template <typename T>
-auto operator*(T a, CMat<T> &&b){
-    CMat<T> ret(b);
+auto operator*(T a, ThrustMat<T> &&b){
+    ThrustMat<T> ret(b);
     auto mul = mul_s<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), mul);
     
@@ -550,8 +550,8 @@ auto operator*(T a, CMat<T> &&b){
 }
 
 template <typename T>
-auto operator*(T a, CMat<T> &b){
-    CMat<T> ret = a * std::move(b);
+auto operator*(T a, ThrustMat<T> &b){
+    ThrustMat<T> ret = a * std::move(b);
     return ret;
 }
 
@@ -568,8 +568,8 @@ struct opp_s
 };
 
 template<typename T>
-auto OPP(CMat<T> &&a){
-    CMat<T> ret(a);    
+auto OPP(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);    
     auto opp = opp_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), opp);
 
@@ -578,40 +578,40 @@ auto OPP(CMat<T> &&a){
 }
 
 template<typename T>
-auto OPP(CMat<T> &a){
-    CMat<T> ret = OPP(std::move(a));
+auto OPP(ThrustMat<T> &a){
+    ThrustMat<T> ret = OPP(std::move(a));
     return ret;
 }
 
 /* div */
 template <typename T>
-auto operator/(CMat<T> &&a, CMat<T> &&b){
+auto operator/(ThrustMat<T> &&a, ThrustMat<T> &&b){
     assert(a.size() == b.size());
 
-    CMat<T> ret(b);
+    ThrustMat<T> ret(b);
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::divides<T>());
     return ret;
 }
 
 template <typename T>
-auto operator/(CMat<T> &&a, CMat<T> &b){
+auto operator/(ThrustMat<T> &&a, ThrustMat<T> &b){
     
-    CMat<T> ret = std::move(a) / std::move(b);
+    ThrustMat<T> ret = std::move(a) / std::move(b);
     return ret;
 }
 
 template <typename T>
-auto operator/(CMat<T> &a, CMat<T> &&b){
+auto operator/(ThrustMat<T> &a, ThrustMat<T> &&b){
 
 
-    CMat<T> ret = std::move(a) / std::move(b);
+    ThrustMat<T> ret = std::move(a) / std::move(b);
     return ret;
 }
 
 template <typename T>
-auto operator/(CMat<T> &a, CMat<T> &b){
+auto operator/(ThrustMat<T> &a, ThrustMat<T> &b){
     
-    CMat<T> ret = std::move(a) / std::move(b);
+    ThrustMat<T> ret = std::move(a) / std::move(b);
     return ret;
 }
 
@@ -631,8 +631,8 @@ struct div_s
 };
 
 template <typename T>
-auto operator/(CMat<T> &&a, T b){
-    CMat<T> ret(a);
+auto operator/(ThrustMat<T> &&a, T b){
+    ThrustMat<T> ret(a);
     auto div = div_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), div);
 
@@ -640,8 +640,8 @@ auto operator/(CMat<T> &&a, T b){
 }
 
 template <typename T>
-auto operator/(CMat<T> &a, T b){
-    CMat<T> ret = std::move(a) / b;
+auto operator/(ThrustMat<T> &a, T b){
+    ThrustMat<T> ret = std::move(a) / b;
     return ret;
 }
 
@@ -662,8 +662,8 @@ struct div_s_2
 
 
 template <typename T>
-auto operator/(T a, CMat<T> &&b){
-    CMat<T> ret(b);
+auto operator/(T a, ThrustMat<T> &&b){
+    ThrustMat<T> ret(b);
     auto div = div_s_2<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), div);
     
@@ -671,18 +671,18 @@ auto operator/(T a, CMat<T> &&b){
 }
 
 template <typename T>
-auto operator/(T a, CMat<T> &b){
-    CMat<T> ret = a / std::move(b);
+auto operator/(T a, ThrustMat<T> &b){
+    ThrustMat<T> ret = a / std::move(b);
     return ret;
 }
 
 /*  Matrix dot */
 
 template<typename T>
-auto mDot(CMat<T> &&a, CMat<T> &&b){
+auto mDot(ThrustMat<T> &&a, ThrustMat<T> &&b){
     
     assert(a.col() == b.row());
-    CMat<T> ret(a.row(), b.col());
+    ThrustMat<T> ret(a.row(), b.col());
 
     if constexpr (std::is_same<T, float>{}) {
         float alpha = 1.0;
@@ -730,30 +730,30 @@ auto mDot(CMat<T> &&a, CMat<T> &&b){
 
 
 template<typename T>
-auto mDot(CMat<T> &a, CMat<T> &b){
-    CMat<T> ret = mDot(std::move(a), std::move(b));
+auto mDot(ThrustMat<T> &a, ThrustMat<T> &b){
+    ThrustMat<T> ret = mDot(std::move(a), std::move(b));
 
     return ret;
 }
 
 template<typename T>
-auto mDot(CMat<T> &&a, CMat<T> &b){
-    CMat<T> ret = mDot(std::move(a), std::move(b));
+auto mDot(ThrustMat<T> &&a, ThrustMat<T> &b){
+    ThrustMat<T> ret = mDot(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto mDot(CMat<T> &a, CMat<T> &&b){
-    CMat<T> ret = mDot(std::move(a), std::move(b)); 
+auto mDot(ThrustMat<T> &a, ThrustMat<T> &&b){
+    ThrustMat<T> ret = mDot(std::move(a), std::move(b)); 
     return ret;
 }
 
 /* vector inner product */
 template<typename T>
-T vDot(CMat<T> &&a, CMat<T> &&b){
+T vDot(ThrustMat<T> &&a, ThrustMat<T> &&b){
     assert(a.size() == b.size());
     
-    CMat<T> s;  /* Scalor */
+    ThrustMat<T> s;  /* Scalor */
 
     if constexpr (std::is_same<T, float>{}) {    
         cublasSdot(
@@ -787,26 +787,26 @@ T vDot(CMat<T> &&a, CMat<T> &&b){
 
 
 template<typename T>
-auto vDot(CMat<T> &a, CMat<T> &&b){
+auto vDot(ThrustMat<T> &a, ThrustMat<T> &&b){
     auto ret = vDot(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto vDot(CMat<T> &&a, CMat<T> &b){
+auto vDot(ThrustMat<T> &&a, ThrustMat<T> &b){
     auto ret = vDot(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto vDot(CMat<T> &a, CMat<T> &b){
+auto vDot(ThrustMat<T> &a, ThrustMat<T> &b){
     auto ret = vDot(std::move(a), std::move(b));
     return ret;
 }
 
 /* Matrix dot */
 template<typename T>
-auto dot(CMat<T> &&a, bool T1 , CMat<T> &&b, bool T2 ){
+auto dot(ThrustMat<T> &&a, bool T1 , ThrustMat<T> &&b, bool T2 ){
     
     cublasOperation_t t1, t2;
     int a_row, a_col, b_row, b_col;
@@ -847,7 +847,7 @@ auto dot(CMat<T> &&a, bool T1 , CMat<T> &&b, bool T2 ){
         b_col =  b.row(); 
     }    
 
-    CMat<T> ret(a_row, b_col);
+    ThrustMat<T> ret(a_row, b_col);
 
     if constexpr (std::is_same<T, float>{}) {
         float alpha = 1.0;
@@ -896,23 +896,23 @@ auto dot(CMat<T> &&a, bool T1 , CMat<T> &&b, bool T2 ){
 
 
 template<typename T>
-auto dot(CMat<T> &&a, bool T1 , CMat<T> &b, bool T2 ){
-    CMat<T> ret = dot(std::move(a), T1, std::move(b), T2); 
+auto dot(ThrustMat<T> &&a, bool T1 , ThrustMat<T> &b, bool T2 ){
+    ThrustMat<T> ret = dot(std::move(a), T1, std::move(b), T2); 
     return ret;
 
 }
 
 template<typename T>
-auto dot(CMat<T> &a, bool T1 , CMat<T> &&b, bool T2 ){
-    CMat<T> ret = dot(std::move(a), T1, std::move(b), T2); 
+auto dot(ThrustMat<T> &a, bool T1 , ThrustMat<T> &&b, bool T2 ){
+    ThrustMat<T> ret = dot(std::move(a), T1, std::move(b), T2); 
     return ret;
 
 }
 
 
 template<typename T>
-auto dot(CMat<T> &a, bool T1 , CMat<T> &b, bool T2 ){
-    CMat<T> ret = dot(std::move(a), T1, std::move(b), T2); 
+auto dot(ThrustMat<T> &a, bool T1 , ThrustMat<T> &b, bool T2 ){
+    ThrustMat<T> ret = dot(std::move(a), T1, std::move(b), T2); 
     return ret;
 
 }
@@ -931,8 +931,8 @@ struct Cos_s
 };
 
 template <typename T>
-auto cos(CMat<T> &&a){
-    CMat<T> ret(a);
+auto cos(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Cos = Cos_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Cos);
     
@@ -940,8 +940,8 @@ auto cos(CMat<T> &&a){
 }
 
 template <typename T>
-auto cos(CMat<T> &a){
-    CMat<T> ret = cos(std::move(a));
+auto cos(ThrustMat<T> &a){
+    ThrustMat<T> ret = cos(std::move(a));
     
     return ret;
 }
@@ -958,8 +958,8 @@ struct Sin_s
 };
 
 template <typename T>
-auto sin(CMat<T> &&a){
-    CMat<T> ret(a);
+auto sin(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Sin = Sin_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Sin);
     
@@ -967,8 +967,8 @@ auto sin(CMat<T> &&a){
 }
 
 template <typename T>
-auto sin(CMat<T> &a){
-    CMat<T> ret = sin(std::move(a));
+auto sin(ThrustMat<T> &a){
+    ThrustMat<T> ret = sin(std::move(a));
     
     return ret;
 }
@@ -986,8 +986,8 @@ struct Tan_s
 };
 
 template <typename T>
-auto tan(CMat<T> &&a){
-    CMat<T> ret(a);
+auto tan(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Tan = Tan_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Tan);
     
@@ -995,8 +995,8 @@ auto tan(CMat<T> &&a){
 }
 
 template <typename T>
-auto tan(CMat<T> &a){
-    CMat<T> ret = tan(std::move(a));
+auto tan(ThrustMat<T> &a){
+    ThrustMat<T> ret = tan(std::move(a));
     
     return ret;
 }
@@ -1014,8 +1014,8 @@ struct Exp_s
 };
 
 template <typename T>
-auto exp(CMat<T> &&a){
-    CMat<T> ret(a);
+auto exp(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Exp = Exp_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Exp);
     
@@ -1023,8 +1023,8 @@ auto exp(CMat<T> &&a){
 }
 
 template <typename T>
-auto exp(CMat<T> &a){
-    CMat<T> ret = exp(std::move(a));
+auto exp(ThrustMat<T> &a){
+    ThrustMat<T> ret = exp(std::move(a));
     
     return ret;
 }
@@ -1042,8 +1042,8 @@ struct Log_s
 };
 
 template <typename T>
-auto log(CMat<T> &&a){
-    CMat<T> ret(a);
+auto log(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Log = Log_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Log);
     
@@ -1051,8 +1051,8 @@ auto log(CMat<T> &&a){
 }
 
 template <typename T>
-auto log(CMat<T> &a){
-    CMat<T> ret = log(std::move(a));
+auto log(ThrustMat<T> &a){
+    ThrustMat<T> ret = log(std::move(a));
     
     return ret;
 }
@@ -1070,8 +1070,8 @@ struct Sqrt_s
 };
 
 template <typename T>
-auto sqrt(CMat<T> &&a){
-    CMat<T> ret(a);
+auto sqrt(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Sqrt = Sqrt_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Sqrt);
     
@@ -1079,8 +1079,8 @@ auto sqrt(CMat<T> &&a){
 }
 
 template <typename T>
-auto sqrt(CMat<T> &a){
-    CMat<T> ret = sqrt(std::move(a));
+auto sqrt(ThrustMat<T> &a){
+    ThrustMat<T> ret = sqrt(std::move(a));
     
     return ret;
 }
@@ -1103,8 +1103,8 @@ struct Pow_s
 };
 
 template <typename T, typename U>
-auto pow(CMat<T> &&a, U b){
-    CMat<T> ret(a);
+auto pow(ThrustMat<T> &&a, U b){
+    ThrustMat<T> ret(a);
     auto Pow = Pow_s<T,U>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), Pow);
     
@@ -1112,8 +1112,8 @@ auto pow(CMat<T> &&a, U b){
 }
 
 template <typename T, typename U>
-auto pow(CMat<T> &a, U b){
-    CMat<T> ret = pow(std::move(a), b);
+auto pow(ThrustMat<T> &a, U b){
+    ThrustMat<T> ret = pow(std::move(a), b);
     
     return ret;
 }
@@ -1122,9 +1122,9 @@ auto pow(CMat<T> &a, U b){
 
 /* resize */
 template<typename T>
-auto resize(CMat<T> &&a, int r, int c){
+auto resize(ThrustMat<T> &&a, int r, int c){
     assert(a.size() == r*c);
-    CMat<T> ret = a;
+    ThrustMat<T> ret = a;
     ret.setRow = r;
     ret.setCol = c;
     return ret;
@@ -1133,9 +1133,9 @@ auto resize(CMat<T> &&a, int r, int c){
 
 
 template<typename T>
-auto resize(CMat<T> &a, int r, int c){
+auto resize(ThrustMat<T> &a, int r, int c){
     assert(a.size() == r*c);
-    CMat<T> ret = resize(std::move(a), r, c);
+    ThrustMat<T> ret = resize(std::move(a), r, c);
     
     return ret;
 
@@ -1174,10 +1174,10 @@ void copyMat(thrust::device_ptr<T> src, thrust::device_ptr<T> dst, unsigned src_
 
 /* Concat Horizon */
 template<typename T>
-auto concatH(CMat<T> &&a, CMat<T> &&b){
+auto concatH(ThrustMat<T> &&a, ThrustMat<T> &&b){
     assert(a.row() == b.row());
     
-    CMat<T> ret(a);
+    ThrustMat<T> ret(a);
 
     ret.reserve(a.size() + b.size());
     ret.setCol(a.col() + b.col());
@@ -1187,24 +1187,24 @@ auto concatH(CMat<T> &&a, CMat<T> &&b){
 }
 
 template<typename T>
-auto concatH(CMat<T> &&a, CMat<T> &b){
+auto concatH(ThrustMat<T> &&a, ThrustMat<T> &b){
     
-    CMat<T> ret = concatH(std::move(a), std::move(b));
+    ThrustMat<T> ret = concatH(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto concatH(CMat<T> &a, CMat<T> &&b){
+auto concatH(ThrustMat<T> &a, ThrustMat<T> &&b){
     
-    CMat<T> ret = concatH(std::move(a), std::move(b));
+    ThrustMat<T> ret = concatH(std::move(a), std::move(b));
     return ret;
 }
 
 
 template<typename T>
-auto concatH(CMat<T> &a, CMat<T> &b){
+auto concatH(ThrustMat<T> &a, ThrustMat<T> &b){
     
-    CMat<T> ret = concatH(std::move(a), std::move(b));
+    ThrustMat<T> ret = concatH(std::move(a), std::move(b));
     return ret;
 }
 
@@ -1214,10 +1214,10 @@ auto concatH(CMat<T> &a, CMat<T> &b){
 
 
 template<typename T>
-auto concatV(CMat<T> &&a, CMat<T> &&b){
+auto concatV(ThrustMat<T> &&a, ThrustMat<T> &&b){
     assert(a.col() == b.col());
 
-    CMat<T> ret(a.row() + b.row(), a.col());
+    ThrustMat<T> ret(a.row() + b.row(), a.col());
 
     int offset = 0;
     copyMat(a.data(), ret.data(), a.row(), a.col(), ret.row(), offset);
@@ -1229,43 +1229,43 @@ auto concatV(CMat<T> &&a, CMat<T> &&b){
 
 
 template<typename T>
-auto concatV(CMat<T> &a, CMat<T> &b){
+auto concatV(ThrustMat<T> &a, ThrustMat<T> &b){
    
-    CMat<T> ret = concatV(std::move(a), std::move(b));
+    ThrustMat<T> ret = concatV(std::move(a), std::move(b));
     
     return ret;
 }
 
 
 template<typename T>
-auto concatV(CMat<T> &&a, CMat<T> &b){
+auto concatV(ThrustMat<T> &&a, ThrustMat<T> &b){
    
-    CMat<T> ret = concatV(std::move(a), std::move(b));
+    ThrustMat<T> ret = concatV(std::move(a), std::move(b));
     
     return ret;
 }
 
 template<typename T>
-auto concatV(CMat<T> &a, CMat<T> &&b){
+auto concatV(ThrustMat<T> &a, ThrustMat<T> &&b){
    
-    CMat<T> ret = concatV(std::move(a), std::move(b));
+    ThrustMat<T> ret = concatV(std::move(a), std::move(b));
     
     return ret;
 }
 
 /* TransPosition  */
 template<typename T>
-auto TP(CMat<T> &&a){
+auto TP(ThrustMat<T> &&a){
     
-    CMat<T> ret(a);
+    ThrustMat<T> ret(a);
     ret.trans();
 
     return ret;
 }
 
 template<typename T>
-auto TP(CMat<T> &a){
-    CMat<T> ret = TP(std::move(a));
+auto TP(ThrustMat<T> &a){
+    ThrustMat<T> ret = TP(std::move(a));
     
     return ret;
 }
@@ -1284,8 +1284,8 @@ struct Relu_s
 };
 
 template <typename T>
-auto relu(CMat<T> &&a){
-    CMat<T> ret(a);
+auto relu(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Relu = Relu_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Relu);
     
@@ -1293,8 +1293,8 @@ auto relu(CMat<T> &&a){
 }
 
 template <typename T>
-auto relu(CMat<T> &a){
-    CMat<T> ret = relu(std::move(a));
+auto relu(ThrustMat<T> &a){
+    ThrustMat<T> ret = relu(std::move(a));
     
     return ret;
 }
@@ -1311,8 +1311,8 @@ struct Sig_s
 };
 
 template <typename T>
-auto sigmoid(CMat<T> &&a){
-    CMat<T> ret(a);
+auto sigmoid(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
     auto Sig = Sig_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Sig);
     
@@ -1320,17 +1320,17 @@ auto sigmoid(CMat<T> &&a){
 }
 
 template <typename T>
-auto sigmoid(CMat<T> &a){
-    CMat<T> ret = sigmoid(std::move(a));
+auto sigmoid(ThrustMat<T> &a){
+    ThrustMat<T> ret = sigmoid(std::move(a));
     
     return ret;
 }
 
 /* Summation Vertical direction */
 template <typename T>
-auto sumV(CMat<T> &&a){
+auto sumV(ThrustMat<T> &&a){
 
-    CMat<T> ret(1, a.col());
+    ThrustMat<T> ret(1, a.col());
     thrust::device_vector<T> d_ones(a.row(), 1.0);
 
     T alpha = 1.0;
@@ -1374,7 +1374,7 @@ auto sumV(CMat<T> &&a){
 }
 
 template <typename T>
-auto sumV(CMat<T> &a){
+auto sumV(ThrustMat<T> &a){
     
     return sumV(std::move(a));
 
@@ -1382,9 +1382,9 @@ auto sumV(CMat<T> &a){
 
 /* Summation Horizontal direction */
 template <typename T>
-auto sumH(CMat<T> &&a){
+auto sumH(ThrustMat<T> &&a){
 
-    CMat<T> ret(a.row(), 1);
+    ThrustMat<T> ret(a.row(), 1);
     thrust::device_vector<T> d_ones(a.col(), 1.0);
 
     T alpha = 1.0;
@@ -1427,7 +1427,7 @@ auto sumH(CMat<T> &&a){
 }
 
 template <typename T>
-auto sumH(CMat<T> &a){
+auto sumH(ThrustMat<T> &a){
     return sumH(std::move(a));
 }
 
@@ -1447,8 +1447,8 @@ struct GenRand
 };
 
 template <typename T>
-auto rand(CMat<T> &&a){
-    CMat<T> ret(a);
+auto rand(ThrustMat<T> &&a){
+    ThrustMat<T> ret(a);
  
     thrust::transform(
         thrust::make_counting_iterator(0),
@@ -1461,7 +1461,7 @@ auto rand(CMat<T> &&a){
 }
 
 template <typename T>
-auto rand(CMat<T> &a){
+auto rand(ThrustMat<T> &a){
     return rand(std::move(a));
 }
 
@@ -1490,12 +1490,12 @@ int main(){
                                                             {0,5,5,0}
                                                             };        
 
-    CMat Dx(x);
-    CMat Dz(z);
-    CMat Dy(y, VectorType::Row);
+    ThrustMat Dx(x);
+    ThrustMat Dz(z);
+    ThrustMat Dy(y, VectorType::Row);
 
-    CMat Dw(w, VectorType::Row);
-    CMat Db(b);
+    ThrustMat Dw(w, VectorType::Row);
+    ThrustMat Db(b);
 
     cublasCreate(&g_handle);
 
