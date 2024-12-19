@@ -8,7 +8,9 @@
 #include <thrust/reduce.h>
 #include <thrust/random.h>
 
-template<typename T> class ThrustVector;
+namespace mt{
+template<typename T> class device_vector;
+};
 
 cublasHandle_t g_handle;
 
@@ -66,9 +68,9 @@ auto transpose(thrust::host_vector<T>&& src, size_t m, size_t n)
 
 
 template <typename T>
-ThrustVector<T> transpose(ThrustVector<T>& src, size_t m, size_t n)
+mt::device_vector<T> transpose(mt::device_vector<T>& src, size_t m, size_t n)
 {
-    ThrustVector<T> dst(m *n);
+    mt::device_vector<T> dst(m *n);
     
     thrust::counting_iterator<size_t> indices(0);
 
@@ -80,9 +82,9 @@ ThrustVector<T> transpose(ThrustVector<T>& src, size_t m, size_t n)
     return dst;
 }
 
-
+namespace mt{
 template<typename T = float>
-class ThrustVector : public thrust::device_vector<T>{
+class device_vector : public thrust::device_vector<T>{
 
 public: 
 
@@ -101,7 +103,7 @@ public:
 
 
     /* Scalor */
-    ThrustVector()
+    device_vector()
     : thrust::device_vector<T>::device_vector(1) 
     {
         row_ = 1;
@@ -109,7 +111,7 @@ public:
     }
 
     /* Vector */
-    ThrustVector(int sz, VectorType type)
+    device_vector(int sz, VectorType type)
     : thrust::device_vector<T>::device_vector(sz) 
     {
         if(type == VectorType::Row){
@@ -122,7 +124,7 @@ public:
     }
 
     /* Matrix */
-    ThrustVector(int r, int c)
+    device_vector(int r, int c)
     : thrust::device_vector<T>::device_vector(r*c) 
     {
         row_ = r;
@@ -130,7 +132,7 @@ public:
     }
 
     /* device vector */
-    ThrustVector(thrust::device_vector<T> &d, VectorType type)
+    device_vector(thrust::device_vector<T> &d, VectorType type)
     :thrust::device_vector<T>::device_vector(d)
     {
         if(type == VectorType::Row){
@@ -143,7 +145,7 @@ public:
     }
 
     /* copy constructor */
-    ThrustVector(ThrustVector<T> &a)
+    device_vector(device_vector<T> &a)
     : thrust::device_vector<T>::device_vector(a)
     {
        // type_ = a.type_;
@@ -152,7 +154,7 @@ public:
     }
 
     /* host vector */
-    ThrustVector(thrust::host_vector<T> &h, VectorType type)
+    device_vector(thrust::host_vector<T> &h, VectorType type)
     : thrust::device_vector<T>::device_vector(h)
     {
         if(type == VectorType::Row){
@@ -165,7 +167,7 @@ public:
     }
 
     /* Matrix */
-    ThrustVector(thrust::device_vector<T> &d, int row, int col)
+    device_vector(thrust::device_vector<T> &d, int row, int col)
     : thrust::device_vector<T>::device_vector(d)
     {
         row_ = row;
@@ -173,7 +175,7 @@ public:
     }
 
     /* host vector Matrix 1 */
-    ThrustVector(thrust::host_vector<T> &h, int r, int c)
+    device_vector(thrust::host_vector<T> &h, int r, int c)
     :thrust::device_vector<T>::device_vector(h)
     {
         row_ = r; 
@@ -181,7 +183,7 @@ public:
     }
 
     /* host vector Matrix 2 */
-    ThrustVector(thrust::host_vector<thrust::host_vector<T>> &hvv)
+    device_vector(thrust::host_vector<thrust::host_vector<T>> &hvv)
     :  thrust::device_vector<T>::device_vector( transpose(line(hvv), hvv.size(), hvv[0].size()))
     {
         row_ = hvv.size();
@@ -211,30 +213,8 @@ private:
     int col_;
 };
 
-template <typename T>
-void print(ThrustVector<T>&& d)
-{
-    std::cout << "------" << std::endl;    
-    thrust::host_vector<T> out(transpose(d, d.col(), d.row()));   
-    for(int i=0; i<d.row(); ++i){
-        thrust::copy(out.begin() + d.col() * i, out.begin() + d.col() * (i + 1) , std::ostream_iterator<float>(std::cout, " ")); 
-        std::cout << std::endl;
-    }
-}
-
-
-
-template <typename T>
-void print(ThrustVector<T>& d)
-{
-    print(std::move(d));
-}
-
-
-
-
 template<typename T>
-class ThrustQueue{
+class device_queue{
 public:
     size_t size(){
         return vec.size();
@@ -255,33 +235,60 @@ private:
 };
 
 
+
+};
+
 template <typename T>
-auto operator+(ThrustVector<T> &&a, ThrustVector<T> &&b){
+void print(mt::device_vector<T>&& d)
+{
+    std::cout << "------" << std::endl;    
+    thrust::host_vector<T> out(transpose(d, d.col(), d.row()));   
+    for(int i=0; i<d.row(); ++i){
+        thrust::copy(out.begin() + d.col() * i, out.begin() + d.col() * (i + 1) , std::ostream_iterator<float>(std::cout, " ")); 
+        std::cout << std::endl;
+    }
+}
+
+
+
+template <typename T>
+void print(mt::device_vector<T>& d)
+{
+    print(std::move(d));
+}
+
+
+
+
+
+
+template <typename T>
+auto operator+(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert(a.size() == b.size());
 
-    ThrustVector<T> ret(b);
+    mt::device_vector<T> ret(b);
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::plus<T>());
 
     return ret;
 }
 
 template <typename T>
-auto operator+(ThrustVector<T> &a, ThrustVector<T> &b){
-    ThrustVector<T> ret = std::move(a) + std::move(b);
+auto operator+(mt::device_vector<T> &a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator+(ThrustVector<T> &&a, ThrustVector<T> &b){
-    ThrustVector<T> ret = std::move(a) + std::move(b);
+auto operator+(mt::device_vector<T> &&a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator+(ThrustVector<T> &a, ThrustVector<T> &&b){
-    ThrustVector<T> ret = std::move(a) + std::move(b);
+auto operator+(mt::device_vector<T> &a, mt::device_vector<T> &&b){
+    mt::device_vector<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
@@ -302,8 +309,8 @@ struct add_s
 };
 
 template <typename T>
-auto operator+(ThrustVector<T> &&a, T b){
-    ThrustVector<T> ret(a);
+auto operator+(mt::device_vector<T> &&a, T b){
+    mt::device_vector<T> ret(a);
     auto add = add_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), add);
     
@@ -311,14 +318,14 @@ auto operator+(ThrustVector<T> &&a, T b){
 }
 
 template <typename T>
-auto operator+(ThrustVector<T> &a, T b){
-    ThrustVector<T> ret = std::move(a) + b;
+auto operator+(mt::device_vector<T> &a, T b){
+    mt::device_vector<T> ret = std::move(a) + b;
     return ret;
 }
 
 template <typename T>
-auto operator+(T a, ThrustVector<T> &&b){
-    ThrustVector<T> ret(b);
+auto operator+(T a, mt::device_vector<T> &&b){
+    mt::device_vector<T> ret(b);
     auto add = add_s<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), add);
     
@@ -326,8 +333,8 @@ auto operator+(T a, ThrustVector<T> &&b){
 }
 
 template <typename T>
-auto operator+(T a, ThrustVector<T> &b){
-    ThrustVector<T> ret = a + std::move(b);
+auto operator+(T a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = a + std::move(b);
     return ret;
 }
 
@@ -337,33 +344,33 @@ auto operator+(T a, ThrustVector<T> &b){
 /* sub */
 
 template <typename T>
-auto operator-(ThrustVector<T> &&a, ThrustVector<T> &&b){
+auto operator-(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
 
     assert(a.size() == b.size());
 
-    ThrustVector<T> ret(b);
+    mt::device_vector<T> ret(b);
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::minus<T>());
 
     return ret;
 }
 
 template <typename T>
-auto operator-(ThrustVector<T> &a, ThrustVector<T> &b){
-    ThrustVector<T> ret = std::move(a) + std::move(b);
+auto operator-(mt::device_vector<T> &a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = std::move(a) + std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator-(ThrustVector<T> &&a, ThrustVector<T> &b){
-    ThrustVector<T> ret = std::move(a) - std::move(b);
+auto operator-(mt::device_vector<T> &&a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = std::move(a) - std::move(b);
     
     return ret;
 }
 
 template <typename T>
-auto operator-(ThrustVector<T> &a, ThrustVector<T> &&b){
-    ThrustVector<T> ret = std::move(a) - std::move(b);
+auto operator-(mt::device_vector<T> &a, mt::device_vector<T> &&b){
+    mt::device_vector<T> ret = std::move(a) - std::move(b);
     
     return ret;
 }
@@ -384,8 +391,8 @@ struct sub_s
 };
 
 template <typename T>
-auto operator-(ThrustVector<T> &&a, T b){
-    ThrustVector<T> ret(a);
+auto operator-(mt::device_vector<T> &&a, T b){
+    mt::device_vector<T> ret(a);
     auto sub = sub_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), sub);
     
@@ -393,8 +400,8 @@ auto operator-(ThrustVector<T> &&a, T b){
 }
 
 template <typename T>
-auto operator-(ThrustVector<T> &a, T b){
-    ThrustVector<T> ret = std::move(a) - b;
+auto operator-(mt::device_vector<T> &a, T b){
+    mt::device_vector<T> ret = std::move(a) - b;
     return ret;
 }
 
@@ -417,8 +424,8 @@ struct sub_s_2
 
 
 template <typename T>
-auto operator-(T a, ThrustVector<T> &&b){
-    ThrustVector<T> ret(b);
+auto operator-(T a, mt::device_vector<T> &&b){
+    mt::device_vector<T> ret(b);
     auto sub = sub_s_2<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), sub);
     
@@ -426,18 +433,18 @@ auto operator-(T a, ThrustVector<T> &&b){
 }
 
 template <typename T>
-auto operator-(T a, ThrustVector<T> &b){
-    ThrustVector<T> ret = a - std::move(b);
+auto operator-(T a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = a - std::move(b);
     return ret;
 }
 
 
 /* mul */
 template <typename T>
-auto operator*(ThrustVector<T> &&a, ThrustVector<T> &&b){
+auto operator*(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
 
     assert(a.size() == b.size());
-    ThrustVector<T> ret(b);
+    mt::device_vector<T> ret(b);
 
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::multiplies<T>());
 
@@ -446,27 +453,27 @@ auto operator*(ThrustVector<T> &&a, ThrustVector<T> &&b){
 }
 
 template <typename T>
-auto operator*(ThrustVector<T> &a, ThrustVector<T> &b){
+auto operator*(mt::device_vector<T> &a, mt::device_vector<T> &b){
 
-    ThrustVector<T> ret = std::move(a) * std::move(b);
-
-    return ret;
-
-}
-
-template <typename T>
-auto operator*(ThrustVector<T> &&a, ThrustVector<T> &b){
-
-    ThrustVector<T> ret = std::move(a) * std::move(b);
+    mt::device_vector<T> ret = std::move(a) * std::move(b);
 
     return ret;
 
 }
 
 template <typename T>
-auto operator*(ThrustVector<T> &a, ThrustVector<T> &&b){
+auto operator*(mt::device_vector<T> &&a, mt::device_vector<T> &b){
 
-    ThrustVector<T> ret = std::move(a) * std::move(b);
+    mt::device_vector<T> ret = std::move(a) * std::move(b);
+
+    return ret;
+
+}
+
+template <typename T>
+auto operator*(mt::device_vector<T> &a, mt::device_vector<T> &&b){
+
+    mt::device_vector<T> ret = std::move(a) * std::move(b);
 
     return ret;
 
@@ -488,8 +495,8 @@ struct mul_s
 };
 
 template <typename T>
-auto operator*(ThrustVector<T> &&a, T b){
-    ThrustVector<T> ret(a);
+auto operator*(mt::device_vector<T> &&a, T b){
+    mt::device_vector<T> ret(a);
     auto mul = mul_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), mul);
     
@@ -497,15 +504,15 @@ auto operator*(ThrustVector<T> &&a, T b){
 }
 
 template <typename T>
-auto operator*(ThrustVector<T> &a, T b){
-    ThrustVector<T> ret = std::move(a) * b;
+auto operator*(mt::device_vector<T> &a, T b){
+    mt::device_vector<T> ret = std::move(a) * b;
     return ret;
 }
 
 
 template <typename T>
-auto operator*(T a, ThrustVector<T> &&b){
-    ThrustVector<T> ret(b);
+auto operator*(T a, mt::device_vector<T> &&b){
+    mt::device_vector<T> ret(b);
     auto mul = mul_s<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), mul);
     
@@ -513,8 +520,8 @@ auto operator*(T a, ThrustVector<T> &&b){
 }
 
 template <typename T>
-auto operator*(T a, ThrustVector<T> &b){
-    ThrustVector<T> ret = a * std::move(b);
+auto operator*(T a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = a * std::move(b);
     return ret;
 }
 
@@ -531,8 +538,8 @@ struct opp_s
 };
 
 template<typename T>
-auto OPP(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);    
+auto OPP(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);    
     auto opp = opp_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), opp);
 
@@ -541,40 +548,40 @@ auto OPP(ThrustVector<T> &&a){
 }
 
 template<typename T>
-auto OPP(ThrustVector<T> &a){
-    ThrustVector<T> ret = OPP(std::move(a));
+auto OPP(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = OPP(std::move(a));
     return ret;
 }
 
 /* div */
 template <typename T>
-auto operator/(ThrustVector<T> &&a, ThrustVector<T> &&b){
+auto operator/(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert(a.size() == b.size());
 
-    ThrustVector<T> ret(b);
+    mt::device_vector<T> ret(b);
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::divides<T>());
     return ret;
 }
 
 template <typename T>
-auto operator/(ThrustVector<T> &&a, ThrustVector<T> &b){
+auto operator/(mt::device_vector<T> &&a, mt::device_vector<T> &b){
     
-    ThrustVector<T> ret = std::move(a) / std::move(b);
+    mt::device_vector<T> ret = std::move(a) / std::move(b);
     return ret;
 }
 
 template <typename T>
-auto operator/(ThrustVector<T> &a, ThrustVector<T> &&b){
+auto operator/(mt::device_vector<T> &a, mt::device_vector<T> &&b){
 
 
-    ThrustVector<T> ret = std::move(a) / std::move(b);
+    mt::device_vector<T> ret = std::move(a) / std::move(b);
     return ret;
 }
 
 template <typename T>
-auto operator/(ThrustVector<T> &a, ThrustVector<T> &b){
+auto operator/(mt::device_vector<T> &a, mt::device_vector<T> &b){
     
-    ThrustVector<T> ret = std::move(a) / std::move(b);
+    mt::device_vector<T> ret = std::move(a) / std::move(b);
     return ret;
 }
 
@@ -594,8 +601,8 @@ struct div_s
 };
 
 template <typename T>
-auto operator/(ThrustVector<T> &&a, T b){
-    ThrustVector<T> ret(a);
+auto operator/(mt::device_vector<T> &&a, T b){
+    mt::device_vector<T> ret(a);
     auto div = div_s<T>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), div);
 
@@ -603,8 +610,8 @@ auto operator/(ThrustVector<T> &&a, T b){
 }
 
 template <typename T>
-auto operator/(ThrustVector<T> &a, T b){
-    ThrustVector<T> ret = std::move(a) / b;
+auto operator/(mt::device_vector<T> &a, T b){
+    mt::device_vector<T> ret = std::move(a) / b;
     return ret;
 }
 
@@ -625,8 +632,8 @@ struct div_s_2
 
 
 template <typename T>
-auto operator/(T a, ThrustVector<T> &&b){
-    ThrustVector<T> ret(b);
+auto operator/(T a, mt::device_vector<T> &&b){
+    mt::device_vector<T> ret(b);
     auto div = div_s_2<T>(a);
     thrust::transform(b.begin(), b.end(), ret.begin(), div);
     
@@ -634,8 +641,8 @@ auto operator/(T a, ThrustVector<T> &&b){
 }
 
 template <typename T>
-auto operator/(T a, ThrustVector<T> &b){
-    ThrustVector<T> ret = a / std::move(b);
+auto operator/(T a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = a / std::move(b);
     return ret;
 }
 
@@ -643,13 +650,13 @@ auto operator/(T a, ThrustVector<T> &b){
 /*  Matrix dot */
 
 template<typename T>
-auto mDot(ThrustVector<T> &&a, ThrustVector<T> &&b){
+auto mDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     
     assert(a.col() == b.row());
 
 
 
-    ThrustVector<T> ret(a.row(), b.col());
+    mt::device_vector<T> ret(a.row(), b.col());
     //thrust::device_vector<T> ret(a.row()*b.col());
 
         std::cout << ret.row() << std::endl;
@@ -702,30 +709,30 @@ auto mDot(ThrustVector<T> &&a, ThrustVector<T> &&b){
 
 
 template<typename T>
-auto mDot(ThrustVector<T> &a, ThrustVector<T> &b){
-    ThrustVector<T> ret = mDot(std::move(a), std::move(b));
+auto mDot(mt::device_vector<T> &a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = mDot(std::move(a), std::move(b));
 
     return ret;
 }
 
 template<typename T>
-auto mDot(ThrustVector<T> &&a, ThrustVector<T> &b){
-    ThrustVector<T> ret = mDot(std::move(a), std::move(b));
+auto mDot(mt::device_vector<T> &&a, mt::device_vector<T> &b){
+    mt::device_vector<T> ret = mDot(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto mDot(ThrustVector<T> &a, ThrustVector<T> &&b){
-    ThrustVector<T> ret = mDot(std::move(a), std::move(b)); 
+auto mDot(mt::device_vector<T> &a, mt::device_vector<T> &&b){
+    mt::device_vector<T> ret = mDot(std::move(a), std::move(b)); 
     return ret;
 }
 
 /* vector inner product */
 template<typename T>
-T vDot(ThrustVector<T> &&a, ThrustVector<T> &&b){
+T vDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert(a.size() == b.size());
     
-    ThrustVector<T> s;  /* Scalor */
+    mt::device_vector<T> s;  /* Scalor */
 
     if constexpr (std::is_same<T, float>{}) {    
         cublasSdot(
@@ -759,26 +766,26 @@ T vDot(ThrustVector<T> &&a, ThrustVector<T> &&b){
 
 
 template<typename T>
-auto vDot(ThrustVector<T> &a, ThrustVector<T> &&b){
+auto vDot(mt::device_vector<T> &a, mt::device_vector<T> &&b){
     auto ret = vDot(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto vDot(ThrustVector<T> &&a, ThrustVector<T> &b){
+auto vDot(mt::device_vector<T> &&a, mt::device_vector<T> &b){
     auto ret = vDot(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto vDot(ThrustVector<T> &a, ThrustVector<T> &b){
+auto vDot(mt::device_vector<T> &a, mt::device_vector<T> &b){
     auto ret = vDot(std::move(a), std::move(b));
     return ret;
 }
 
 /* Matrix dot */
 template<typename T>
-auto dot(ThrustVector<T> &&a, bool T1 , ThrustVector<T> &&b, bool T2 ){
+auto dot(mt::device_vector<T> &&a, bool T1 , mt::device_vector<T> &&b, bool T2 ){
     
     cublasOperation_t t1, t2;
     int a_row, a_col, b_row, b_col;
@@ -819,7 +826,7 @@ auto dot(ThrustVector<T> &&a, bool T1 , ThrustVector<T> &&b, bool T2 ){
         b_col =  b.row(); 
     }    
 
-    ThrustVector<T> ret(a_row, b_col);
+    mt::device_vector<T> ret(a_row, b_col);
 
     if constexpr (std::is_same<T, float>{}) {
         float alpha = 1.0;
@@ -868,23 +875,23 @@ auto dot(ThrustVector<T> &&a, bool T1 , ThrustVector<T> &&b, bool T2 ){
 
 
 template<typename T>
-auto dot(ThrustVector<T> &&a, bool T1 , ThrustVector<T> &b, bool T2 ){
-    ThrustVector<T> ret = dot(std::move(a), T1, std::move(b), T2); 
+auto dot(mt::device_vector<T> &&a, bool T1 , mt::device_vector<T> &b, bool T2 ){
+    mt::device_vector<T> ret = dot(std::move(a), T1, std::move(b), T2); 
     return ret;
 
 }
 
 template<typename T>
-auto dot(ThrustVector<T> &a, bool T1 , ThrustVector<T> &&b, bool T2 ){
-    ThrustVector<T> ret = dot(std::move(a), T1, std::move(b), T2); 
+auto dot(mt::device_vector<T> &a, bool T1 , mt::device_vector<T> &&b, bool T2 ){
+    mt::device_vector<T> ret = dot(std::move(a), T1, std::move(b), T2); 
     return ret;
 
 }
 
 
 template<typename T>
-auto dot(ThrustVector<T> &a, bool T1 , ThrustVector<T> &b, bool T2 ){
-    ThrustVector<T> ret = dot(std::move(a), T1, std::move(b), T2); 
+auto dot(mt::device_vector<T> &a, bool T1 , mt::device_vector<T> &b, bool T2 ){
+    mt::device_vector<T> ret = dot(std::move(a), T1, std::move(b), T2); 
     return ret;
 
 }
@@ -903,8 +910,8 @@ struct Cos_s
 };
 
 template <typename T>
-auto cos(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto cos(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Cos = Cos_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Cos);
     
@@ -912,8 +919,8 @@ auto cos(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto cos(ThrustVector<T> &a){
-    ThrustVector<T> ret = cos(std::move(a));
+auto cos(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = cos(std::move(a));
     
     return ret;
 }
@@ -930,8 +937,8 @@ struct Sin_s
 };
 
 template <typename T>
-auto sin(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto sin(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Sin = Sin_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Sin);
     
@@ -939,8 +946,8 @@ auto sin(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto sin(ThrustVector<T> &a){
-    ThrustVector<T> ret = sin(std::move(a));
+auto sin(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = sin(std::move(a));
     
     return ret;
 }
@@ -958,8 +965,8 @@ struct Tan_s
 };
 
 template <typename T>
-auto tan(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto tan(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Tan = Tan_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Tan);
     
@@ -967,8 +974,8 @@ auto tan(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto tan(ThrustVector<T> &a){
-    ThrustVector<T> ret = tan(std::move(a));
+auto tan(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = tan(std::move(a));
     
     return ret;
 }
@@ -986,8 +993,8 @@ struct Exp_s
 };
 
 template <typename T>
-auto exp(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto exp(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Exp = Exp_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Exp);
     
@@ -995,8 +1002,8 @@ auto exp(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto exp(ThrustVector<T> &a){
-    ThrustVector<T> ret = exp(std::move(a));
+auto exp(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = exp(std::move(a));
     
     return ret;
 }
@@ -1014,8 +1021,8 @@ struct Log_s
 };
 
 template <typename T>
-auto log(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto log(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Log = Log_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Log);
     
@@ -1023,8 +1030,8 @@ auto log(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto log(ThrustVector<T> &a){
-    ThrustVector<T> ret = log(std::move(a));
+auto log(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = log(std::move(a));
     
     return ret;
 }
@@ -1042,8 +1049,8 @@ struct Sqrt_s
 };
 
 template <typename T>
-auto sqrt(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto sqrt(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Sqrt = Sqrt_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Sqrt);
     
@@ -1051,8 +1058,8 @@ auto sqrt(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto sqrt(ThrustVector<T> &a){
-    ThrustVector<T> ret = sqrt(std::move(a));
+auto sqrt(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = sqrt(std::move(a));
     
     return ret;
 }
@@ -1075,8 +1082,8 @@ struct Pow_s
 };
 
 template <typename T, typename U>
-auto pow(ThrustVector<T> &&a, U b){
-    ThrustVector<T> ret(a);
+auto pow(mt::device_vector<T> &&a, U b){
+    mt::device_vector<T> ret(a);
     auto Pow = Pow_s<T,U>(b);
     thrust::transform(a.begin(), a.end(), ret.begin(), Pow);
     
@@ -1084,8 +1091,8 @@ auto pow(ThrustVector<T> &&a, U b){
 }
 
 template <typename T, typename U>
-auto pow(ThrustVector<T> &a, U b){
-    ThrustVector<T> ret = pow(std::move(a), b);
+auto pow(mt::device_vector<T> &a, U b){
+    mt::device_vector<T> ret = pow(std::move(a), b);
     
     return ret;
 }
@@ -1094,9 +1101,9 @@ auto pow(ThrustVector<T> &a, U b){
 
 /* resize */
 template<typename T>
-auto resize(ThrustVector<T> &&a, int r, int c){
+auto resize(mt::device_vector<T> &&a, int r, int c){
     assert(a.size() == r*c);
-    ThrustVector<T> ret = a;
+    mt::device_vector<T> ret = a;
     ret.setRow = r;
     ret.setCol = c;
     return ret;
@@ -1105,9 +1112,9 @@ auto resize(ThrustVector<T> &&a, int r, int c){
 
 
 template<typename T>
-auto resize(ThrustVector<T> &a, int r, int c){
+auto resize(mt::device_vector<T> &a, int r, int c){
     assert(a.size() == r*c);
-    ThrustVector<T> ret = resize(std::move(a), r, c);
+    mt::device_vector<T> ret = resize(std::move(a), r, c);
     
     return ret;
 
@@ -1124,9 +1131,9 @@ struct rm2cm_idx_functor : public thrust::unary_function<int, int>
 
   __host__ __device__
   int operator() (int idx)  {
-    unsigned my_r = idx/c;
-    unsigned my_c = idx%c;
-    return (my_c * r) + my_r;
+    unsigned mt_r = idx/c;
+    unsigned mt_c = idx%c;
+    return (mt_c * r) + mt_r;
   }
 };
 
@@ -1146,10 +1153,10 @@ void copyMat(thrust::device_ptr<T> src, thrust::device_ptr<T> dst, unsigned src_
 
 /* Concat Horizon */
 template<typename T>
-auto concatH(ThrustVector<T> &&a, ThrustVector<T> &&b){
+auto concatH(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert(a.row() == b.row());
     
-    ThrustVector<T> ret(a);
+    mt::device_vector<T> ret(a);
 
     ret.reserve(a.size() + b.size());
     ret.setCol(a.col() + b.col());
@@ -1160,24 +1167,24 @@ auto concatH(ThrustVector<T> &&a, ThrustVector<T> &&b){
 }
 
 template<typename T>
-auto concatH(ThrustVector<T> &&a, ThrustVector<T> &b){
+auto concatH(mt::device_vector<T> &&a, mt::device_vector<T> &b){
     
-    ThrustVector<T> ret = concatH(std::move(a), std::move(b));
+    mt::device_vector<T> ret = concatH(std::move(a), std::move(b));
     return ret;
 }
 
 template<typename T>
-auto concatH(ThrustVector<T> &a, ThrustVector<T> &&b){
+auto concatH(mt::device_vector<T> &a, mt::device_vector<T> &&b){
     
-    ThrustVector<T> ret = concatH(std::move(a), std::move(b));
+    mt::device_vector<T> ret = concatH(std::move(a), std::move(b));
     return ret;
 }
 
 
 template<typename T>
-auto concatH(ThrustVector<T> &a, ThrustVector<T> &b){
+auto concatH(mt::device_vector<T> &a, mt::device_vector<T> &b){
     
-    ThrustVector<T> ret = concatH(std::move(a), std::move(b));
+    mt::device_vector<T> ret = concatH(std::move(a), std::move(b));
     return ret;
 }
 
@@ -1187,10 +1194,10 @@ auto concatH(ThrustVector<T> &a, ThrustVector<T> &b){
 
 
 template<typename T>
-auto concatV(ThrustVector<T> &&a, ThrustVector<T> &&b){
+auto concatV(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert(a.col() == b.col());
 
-    ThrustVector<T> ret(a.row() + b.row(), a.col());
+    mt::device_vector<T> ret(a.row() + b.row(), a.col());
 
     int offset = 0;
     copyMat(a.data(), ret.data(), a.row(), a.col(), ret.row(), offset);
@@ -1202,43 +1209,43 @@ auto concatV(ThrustVector<T> &&a, ThrustVector<T> &&b){
 
 
 template<typename T>
-auto concatV(ThrustVector<T> &a, ThrustVector<T> &b){
+auto concatV(mt::device_vector<T> &a, mt::device_vector<T> &b){
    
-    ThrustVector<T> ret = concatV(std::move(a), std::move(b));
+    mt::device_vector<T> ret = concatV(std::move(a), std::move(b));
     
     return ret;
 }
 
 
 template<typename T>
-auto concatV(ThrustVector<T> &&a, ThrustVector<T> &b){
+auto concatV(mt::device_vector<T> &&a, mt::device_vector<T> &b){
    
-    ThrustVector<T> ret = concatV(std::move(a), std::move(b));
+    mt::device_vector<T> ret = concatV(std::move(a), std::move(b));
     
     return ret;
 }
 
 template<typename T>
-auto concatV(ThrustVector<T> &a, ThrustVector<T> &&b){
+auto concatV(mt::device_vector<T> &a, mt::device_vector<T> &&b){
    
-    ThrustVector<T> ret = concatV(std::move(a), std::move(b));
+    mt::device_vector<T> ret = concatV(std::move(a), std::move(b));
     
     return ret;
 }
 
 /* TransPosition  */
 template<typename T>
-auto TP(ThrustVector<T> &&a){
+auto TP(mt::device_vector<T> &&a){
     
-    ThrustVector<T> ret(a);
+    mt::device_vector<T> ret(a);
     ret.trans();
 
     return ret;
 }
 
 template<typename T>
-auto TP(ThrustVector<T> &a){
-    ThrustVector<T> ret = TP(std::move(a));
+auto TP(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = TP(std::move(a));
     
     return ret;
 }
@@ -1257,8 +1264,8 @@ struct Relu_s
 };
 
 template <typename T>
-auto relu(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto relu(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Relu = Relu_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Relu);
     
@@ -1266,8 +1273,8 @@ auto relu(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto relu(ThrustVector<T> &a){
-    ThrustVector<T> ret = relu(std::move(a));
+auto relu(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = relu(std::move(a));
     
     return ret;
 }
@@ -1284,8 +1291,8 @@ struct Sig_s
 };
 
 template <typename T>
-auto sigmoid(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto sigmoid(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     auto Sig = Sig_s<T>();
     thrust::transform(a.begin(), a.end(), ret.begin(), Sig);
     
@@ -1293,17 +1300,17 @@ auto sigmoid(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto sigmoid(ThrustVector<T> &a){
-    ThrustVector<T> ret = sigmoid(std::move(a));
+auto sigmoid(mt::device_vector<T> &a){
+    mt::device_vector<T> ret = sigmoid(std::move(a));
     
     return ret;
 }
 
 /* Summation Vertical direction */
 template <typename T>
-auto sumV(ThrustVector<T> &&a){
+auto sumV(mt::device_vector<T> &&a){
 
-    ThrustVector<T> ret(1, a.col());
+    mt::device_vector<T> ret(1, a.col());
     thrust::device_vector<T> d_ones(a.row(), 1.0);
 
     T alpha = 1.0;
@@ -1347,7 +1354,7 @@ auto sumV(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto sumV(ThrustVector<T> &a){
+auto sumV(mt::device_vector<T> &a){
     
     return sumV(std::move(a));
 
@@ -1355,9 +1362,9 @@ auto sumV(ThrustVector<T> &a){
 
 /* Summation Horizontal direction */
 template <typename T>
-auto sumH(ThrustVector<T> &&a){
+auto sumH(mt::device_vector<T> &&a){
 
-    ThrustVector<T> ret(a.row(), 1);
+    mt::device_vector<T> ret(a.row(), 1);
     thrust::device_vector<T> d_ones(a.col(), 1.0);
 
     T alpha = 1.0;
@@ -1400,7 +1407,7 @@ auto sumH(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto sumH(ThrustVector<T> &a){
+auto sumH(mt::device_vector<T> &a){
     return sumH(std::move(a));
 }
 
@@ -1420,8 +1427,8 @@ struct Rand_s
 
 
 template <typename T>
-auto rand(ThrustVector<T> &&a){
-    ThrustVector<T> ret(a);
+auto rand(mt::device_vector<T> &&a){
+    mt::device_vector<T> ret(a);
     thrust::counting_iterator<int> index_sequence_begin(0);
     
     auto Rand = Rand_s<T>();
@@ -1437,7 +1444,7 @@ auto rand(ThrustVector<T> &&a){
 }
 
 template <typename T>
-auto rand(ThrustVector<T> &a){
+auto rand(mt::device_vector<T> &a){
     return rand(std::move(a));
 }
 
@@ -1453,10 +1460,10 @@ int main(){
     thrust::device_vector<float> d1 = y1;
     thrust::device_vector<float> d2 = y2;
 
-    ThrustVector t1(d1, VectorType::Col);
-    ThrustVector t2(d2, VectorType::Col);
+    mt::device_vector t1(d1, VectorType::Col);
+    mt::device_vector t2(d2, VectorType::Col);
 
-    ThrustQueue<decltype(&t1)> p;
+    mt::device_queue<decltype(&t1)> p;
     
     p.push(&t1);
     p.push(&t2);
@@ -1469,9 +1476,9 @@ int main(){
    
 
 
-    //ThrustVector<float> d1(z);
+    //mt::device_vector<float> d1(z);
     
-    //ThrustQueue<ThrustVector<float>> q1;
+    //ThrustQueue<mt::device_vector<float>> q1;
     //q1.push(d1);
     
     //q1.push(&d1);
@@ -1485,7 +1492,7 @@ int main(){
 
 
 
-    //ThrustQueue<ThrustQueue<ThrustVector<float>*>*> q2;
+    //ThrustQueue<ThrustQueue<mt::device_vector<float>*>*> q2;
 
     //q2.push(&q1); 
     
@@ -1496,7 +1503,7 @@ int main(){
     //}
 
 
-    //ThrustVector<float> d2(x);
+    //mt::device_vector<float> d2(x);
 
     //auto p1 = cos(d2 / 100.0f); 
 
