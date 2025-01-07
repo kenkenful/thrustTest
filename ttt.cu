@@ -1,12 +1,16 @@
 #include <iostream>
 #include <vector>
 #include <cublas_v2.h>
+#include <cuda_runtime.h>
+#include <cuda.h>
+#include <cusolverDn.h> 
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 #include <thrust/sequence.h>
 #include <thrust/gather.h>
 #include <thrust/reduce.h>
 #include <thrust/random.h>
+
 
 namespace mt{
 template<typename T> class device_vector;
@@ -88,7 +92,7 @@ class device_vector : public thrust::device_vector<T>{
 
 public: 
 
-    using thrust::device_vector<T, thrust::THRUST_200500_500_NS::device_allocator<float>>::iterator;
+    using thrust::device_vector<T, thrust::THRUST_200500_500_NS::device_allocator<T>>::iterator;
     using thrust::device_vector<T>::data;
     using thrust::device_vector<T>::begin;
     using thrust::device_vector<T>::end;
@@ -732,7 +736,8 @@ template<typename T>
 T vDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert(a.size() == b.size());
     
-    mt::device_vector<T> s;  /* Scalor */
+    //mt::device_vector<T> s;  /* Scalor */
+    thrust::device_vector<T> s(1);
 
     if constexpr (std::is_same<T, float>{}) {    
         cublasSdot(
@@ -758,9 +763,7 @@ T vDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
 
     }
 
-    T ret = s.data()[0];
-
-    return ret;
+    return s.data()[0];
 
 }
 
@@ -1411,6 +1414,214 @@ auto sumH(mt::device_vector<T> &a){
     return sumH(std::move(a));
 }
 
+/* |a1| + |a2| + |a3| +   */
+template<typename T>
+T abs(mt::device_vector<T> &&a){
+
+    //mt::device_vector<T> s;  /* Scalor */
+    thrust::device_vector<T> s(1);
+
+    if constexpr (std::is_same<T, float>{}) {
+        cublasSasum(
+            g_handle,
+            a.size(),
+            a.data().get(),
+            1,
+            s.data().get()
+        );
+    }else if constexpr (std::is_same<T, double>{}) {
+        cublasDasum(
+            g_handle,
+            a.size(),
+            a.data().get(),
+            1,
+            s.data().get()
+        );
+    }
+
+    return s.data()[0];
+
+}
+
+template<typename T>
+T abs(mt::device_vector<T> &a){
+    return abs(std::move(a));
+}
+
+/* L1 */
+template<typename T>
+T L1(mt::device_vector<T> &&a){
+    return sqrtf(abs(a));
+}
+
+template<typename T>
+T L1(mt::device_vector<T> &a){
+    return L1(std::move(a));
+}
+
+
+/* L2 */
+template<typename T>
+T L2(mt::device_vector<T> &&a){
+
+    mt::device_vector<T> s;  /* Scalor */
+
+    if constexpr (std::is_same<T, float>{}) {
+        cublasSnrm2(
+            g_handle,
+            a.size(),
+            a.data().get(),
+            1,
+            s.data().get()
+        );
+    }else if constexpr (std::is_same<T, double>{}) {
+        cublasDnrm2(
+            g_handle,
+            a.size(),
+            a.data().get(),
+            1,
+            s.data().get()
+        );
+    }
+
+    return s.data()[0];
+
+}
+
+template<typename T>
+T L2(mt::device_vector<T> &a){
+    return L2(std::move(a));
+}
+
+template<typename T>
+union _f2i{
+    T f;
+    int i;
+};
+
+/* inverse matrix　*/
+template<typename T>
+auto INV(mt::device_vector<T> &a){
+    assert( a.col() == a.row() );
+
+    int n = a.col();
+    mt::device_vector<T> A(a);
+
+    mt::device_vector<T> B(n,n);
+    print(B);
+
+    union _f2i<T> d;
+    d.f = 1.0;
+    cuMemsetD2D32((CUdeviceptr)B.data().get(), (n+1)*sizeof(T), d.i, 1, n);
+
+    print(B);
+
+    cusolverStatus_t status;
+    int worksize;
+
+    // dense LAPACK
+    cusolverDnHandle_t handle;
+
+    status = cusolverDnCreate(&handle);
+    assert( status == CUSOLVER_STATUS_SUCCESS );
+
+    if constexpr (std::is_same<T, float>{}) {
+        status = cusolverDnSgetrf_bufferSize(
+              handle,
+              n,                 // 行
+              n,                 // 列
+              A.data().get(),    // A
+              n,                 // Aのヨコハバ
+              &worksize
+              );
+
+        //std::cout << worksize << std::endl;
+        assert( status == CUSOLVER_STATUS_SUCCESS );
+        thrust::device_vector<T> workspace(worksize);
+        thrust::device_vector<int> info(1);
+        thrust::device_vector<int> pivot(n);
+        //std::cout << info[0]<< std::endl;
+
+        status = cusolverDnSgetrf(
+              handle,
+              n,                         // 行
+              n,                         // 列
+              A.data().get(),            // A
+              n,                         // Aのヨコハバ
+              workspace.data().get(),
+              pivot.data().get(),
+              info.data().get()
+              );
+        //std::cout << info[0]<< std::endl;
+
+        assert( status == CUSOLVER_STATUS_SUCCESS );
+        status = cusolverDnSgetrs(
+               handle,
+               CUBLAS_OP_N,
+               n,                     // 行(=列)
+               n,                     // 問題数
+               A.data().get(),        // A
+               n,                     // Aのヨコハバ
+               pivot.data().get(),    // LU分解で得られたピボット
+               B.data().get(),        // B
+               n,                     // Bのヨコハバ
+               info.data().get());
+
+        assert( status == CUSOLVER_STATUS_SUCCESS );
+
+    }else if constexpr (std::is_same<T, double>{}) {
+
+        status = cusolverDnDgetrf_bufferSize(
+              handle,
+              n,                 // 行
+              n,                 // 列
+              A.data().get(),    // A
+              n,                 // Aのヨコハバ
+              &worksize
+              );
+
+        //std::cout << worksize << std::endl;
+        assert( status == CUSOLVER_STATUS_SUCCESS );
+        thrust::device_vector<T> workspace(worksize);
+        thrust::device_vector<int> info(1);
+        thrust::device_vector<int> pivot(n);
+        //std::cout << info[0]<< std::endl;
+
+        status = cusolverDnDgetrf(
+              handle,
+              n,                         // 行
+              n,                         // 列
+              A.data().get(),            // A
+              n,                         // Aのヨコハバ
+              workspace.data().get(),
+              pivot.data().get(),
+              info.data().get()
+              );
+        //std::cout << info[0]<< std::endl;
+
+        assert( status == CUSOLVER_STATUS_SUCCESS );
+        status = cusolverDnDgetrs(
+               handle,
+               CUBLAS_OP_N,
+               n,                     // 行(=列)
+               n,                     // 問題数
+               A.data().get(),        // A
+               n,                     // Aのヨコハバ
+               pivot.data().get(),    // LU分解で得られたピボット
+               B.data().get(),        // B
+               n,                     // Bのヨコハバ
+               info.data().get());
+
+        assert( status == CUSOLVER_STATUS_SUCCESS );
+
+    }
+
+    cusolverDnDestroy(handle);
+
+    return B;
+}
+
+
 /* RANDOM */
 template <typename T>
 struct Rand_s
@@ -1453,22 +1664,33 @@ auto rand(mt::device_vector<T> &a){
 
 int main(){
 
+
     cublasCreate(&g_handle);
+    cublasSetPointerMode(g_handle,CUBLAS_POINTER_MODE_DEVICE); 
 
-    thrust::host_vector<float> y1 = {5,6,5,4,0,1,1,2,3,4,5,4};
-    thrust::host_vector<float> y2 = {7,4,3,3,2,4,5,4,2,1,1,4};      
-    thrust::device_vector<float> d1 = y1;
-    thrust::device_vector<float> d2 = y2;
+    thrust::host_vector<float> y1 = {5,-6};
+    thrust::host_vector<float> y2 = {7,4,3,3};      
 
-    mt::device_vector t1(d1, VectorType::Col);
-    mt::device_vector t2(d2, VectorType::Col);
+    thrust::host_vector<thrust::host_vector<double>> h2 = {
+                                        {1,2},{3,4}
+    };
 
-    mt::device_queue<decltype(&t1)> p;
+    mt::device_vector t1(h2);
+    mt::device_vector t2(y2, VectorType::Col);
+
+    //mt::device_queue<decltype(&t1)> p;
     
-    p.push(&t1);
-    p.push(&t2);
+    //p.push(&t1);
+    //p.push(&t2);
 
-    print(rand(p[0]));
+    //INV(t1);
+
+    print(t1*t1);
+
+    auto ans = INV(t1);
+    print(ans);
+
+    //print(rand(p[0]));
     //print(concatV(  p[0]*p[1]/2.0f -110.0f, p[0]*p[1]/2.0f - 100.0f));
 
     //auto a = p[0];
