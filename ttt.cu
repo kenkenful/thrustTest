@@ -149,7 +149,7 @@ public:
     }
 
     /* copy constructor */
-    device_vector(device_vector<T> &a)
+    device_vector(mt::device_vector<T> &a)
     : thrust::device_vector<T>::device_vector(a)
     {
        // type_ = a.type_;
@@ -1464,7 +1464,8 @@ T L1(mt::device_vector<T> &a){
 template<typename T>
 T L2(mt::device_vector<T> &&a){
 
-    mt::device_vector<T> s;  /* Scalor */
+        //mt::device_vector<T> s;  /* Scalor */
+    thrust::device_vector<T> s(1);
 
     if constexpr (std::is_same<T, float>{}) {
         cublasSnrm2(
@@ -1493,13 +1494,26 @@ T L2(mt::device_vector<T> &a){
     return L2(std::move(a));
 }
 
-template<typename T>
-union _f2i{
-    T f;
-    int i;
-};
 
 /* inverse matrix　*/
+
+template<typename T>
+struct One_s
+{   
+    size_t sz;
+
+    One_s(int n): 
+    sz(n)
+    {}
+
+    __host__ __device__
+    inline T operator()(int index) const
+    {   
+        return (index % sz == 0) ? (T)1 : (T)0;
+    }
+};
+
+
 template<typename T>
 auto INV(mt::device_vector<T> &a){
     assert( a.col() == a.row() );
@@ -1507,12 +1521,18 @@ auto INV(mt::device_vector<T> &a){
     int n = a.col();
     mt::device_vector<T> A(a);
 
-    mt::device_vector<T> B(n,n);
-    print(B);
+    /* create identity matrix */
+    auto One = One_s<T>(n+1);
 
-    union _f2i<T> d;
-    d.f = 1.0;
-    cuMemsetD2D32((CUdeviceptr)B.data().get(), (n+1)*sizeof(T), d.i, 1, n);
+    mt::device_vector<T> B(
+    thrust::make_transform_iterator(
+        thrust::make_counting_iterator<int>(0), One),
+    thrust::make_transform_iterator(
+        thrust::make_counting_iterator<int>(n*n), One)
+    );
+
+    B.setRow(n);
+    B.setCol(n);
 
     print(B);
 
@@ -1671,9 +1691,12 @@ int main(){
     thrust::host_vector<float> y1 = {5,-6};
     thrust::host_vector<float> y2 = {7,4,3,3};      
 
-    thrust::host_vector<thrust::host_vector<double>> h2 = {
-                                        {1,2},{3,4}
-    };
+    thrust::host_vector<thrust::host_vector<float>> h2 = {
+                                                             {1,4,1,2},
+                                                             {9,16,3,4},
+                                                             {2,0,1,0},
+                                                             {1,3,2,1},
+                                                            };
 
     mt::device_vector t1(h2);
     mt::device_vector t2(y2, VectorType::Col);
@@ -1685,7 +1708,7 @@ int main(){
 
     //INV(t1);
 
-    print(t1*t1);
+    print(t1);
 
     auto ans = INV(t1);
     print(ans);
