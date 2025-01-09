@@ -17,6 +17,8 @@ template<typename T> class device_vector;
 };
 
 cublasHandle_t g_handle;
+cusolverDnHandle_t g_handle2;
+
 
 enum class VectorType
 { 
@@ -238,8 +240,6 @@ private:
 
 };
 
-
-
 };
 
 template <typename T>
@@ -253,18 +253,11 @@ void print(mt::device_vector<T>&& d)
     }
 }
 
-
-
 template <typename T>
 void print(mt::device_vector<T>& d)
 {
     print(std::move(d));
 }
-
-
-
-
-
 
 template <typename T>
 auto operator+(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
@@ -342,11 +335,7 @@ auto operator+(T a, mt::device_vector<T> &b){
     return ret;
 }
 
-
-
-
 /* sub */
-
 template <typename T>
 auto operator-(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
 
@@ -410,7 +399,6 @@ auto operator-(mt::device_vector<T> &a, T b){
 }
 
 
-
 template<typename T>
 struct sub_s_2
 {   
@@ -442,7 +430,6 @@ auto operator-(T a, mt::device_vector<T> &b){
     return ret;
 }
 
-
 /* mul */
 template <typename T>
 auto operator*(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
@@ -453,7 +440,6 @@ auto operator*(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     thrust::transform(a.begin(), a.end(), b.begin(), ret.begin(), thrust::multiplies<T>());
 
     return ret;
-
 }
 
 template <typename T>
@@ -462,7 +448,6 @@ auto operator*(mt::device_vector<T> &a, mt::device_vector<T> &b){
     mt::device_vector<T> ret = std::move(a) * std::move(b);
 
     return ret;
-
 }
 
 template <typename T>
@@ -480,7 +465,6 @@ auto operator*(mt::device_vector<T> &a, mt::device_vector<T> &&b){
     mt::device_vector<T> ret = std::move(a) * std::move(b);
 
     return ret;
-
 }
 
 template<typename T>
@@ -652,13 +636,10 @@ auto operator/(T a, mt::device_vector<T> &b){
 
 
 /*  Matrix dot */
-
 template<typename T>
 auto mDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     
     assert(a.col() == b.row());
-
-
 
     mt::device_vector<T> ret(a.row(), b.col());
     //thrust::device_vector<T> ret(a.row()*b.col());
@@ -692,19 +673,19 @@ auto mDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
         double beta = 0.0;
         cublasDgemm(    
             g_handle,
-            CUBLAS_OP_N, //行列A 転置有無
-            CUBLAS_OP_N, //行列B 転置有無
-            a.row(),     // 行列Aの行数
-            b.row(),     // 行列Bの列数
-            a.col(),     // 行列Aの列数(=行列Ｂの行数)
-            &alpha,      // 行列の積に掛ける値(なければ1)
+            CUBLAS_OP_N,        //行列A 転置有無
+            CUBLAS_OP_N,        //行列B 転置有無
+            a.row(),            // 行列Aの行数
+            b.row(),            // 行列Bの列数
+            a.col(),            // 行列Aの列数(=行列Ｂの行数)
+            &alpha,             // 行列の積に掛ける値(なければ1)
             a.data().get(),     // 行列A
-            a.row(),     // 行列Aの行数
+            a.row(),            // 行列Aの行数
             b.data().get(),     // 行列B
-            b.row(),     // 行列Bの行数
-            &beta,       // 行列Cに掛けるスカラ値(なければ0)
+            b.row(),            // 行列Bの行数
+            &beta,              // 行列Cに掛けるスカラ値(なければ0)
             ret.data().get(),   // 行列Cの初期値 兼 出力先
-            ret.row()    // 行列Cの行数
+            ret.row()           // 行列Cの行数
         );
     }
 
@@ -836,46 +817,44 @@ auto dot(mt::device_vector<T> &&a, bool T1 , mt::device_vector<T> &&b, bool T2 )
         float beta = 0.0;
         cublasSgemm(    
             g_handle,
-            t1,             // 行列A 転置有無
-            t2,             // 行列B 転置有無
-            a_row,          // 行列Aの行数
-            b_row,          // 行列Bの列数
-            a_col,          // 行列Aの列数(=行列Ｂの行数)
-            &alpha,         // 行列の積に掛ける値(なければ1)
-            a.data().get(),        // 行列A
-            a_row,          // 行列Aの行数
-            b.data().get(),        // 行列B
-            b_row,          // 行列Bの行数
-            &beta,          // 行列Cに掛けるスカラ値(なければ0)
-            ret.data().get(),      // 行列Cの初期値 兼 出力先
-            ret.row()       // 行列Cの行数
+            t1,                 // 行列A 転置有無
+            t2,                 // 行列B 転置有無
+            a_row,              // 行列Aの行数
+            b_row,              // 行列Bの列数
+            a_col,              // 行列Aの列数(=行列Ｂの行数)
+            &alpha,             // 行列の積に掛ける値(なければ1)
+            a.data().get(),     // 行列A
+            a_row,              // 行列Aの行数
+            b.data().get(),     // 行列B
+            b_row,              // 行列Bの行数
+            &beta,              // 行列Cに掛けるスカラ値(なければ0)
+            ret.data().get(),   // 行列Cの初期値 兼 出力先
+            ret.row()           // 行列Cの行数
         );
 
     }else if constexpr(std::is_same<T, double>{}){
-            double alpha = 1.0;
-            double beta = 0.0;
-            cublasDgemm(    
-                g_handle,
-                CUBLAS_OP_N, // 行列A 転置有無
-                CUBLAS_OP_N, // 行列B 転置有無
-                a_row,       // 行列Aの行数
-                b_row,       // 行列Bの列数
-                a_col,       // 行列Aの列数(=行列Ｂの行数)
-                &alpha,      // 行列の積に掛ける値(なければ1)
-                a.data().get(),     // 行列A
-                a_row,       // 行列Aの行数
-                b.data().get(),     // 行列B
-                b_row,       // 行列Bの行数
-                &beta,       // 行列Cに掛けるスカラ値(なければ0)
-                ret.data().get(),   // 行列Cの初期値 兼 出力先
-                ret.row()    // 行列Cの行数
-            );
+        double alpha = 1.0;
+        double beta = 0.0;
+        cublasDgemm(    
+            g_handle,
+            CUBLAS_OP_N,        // 行列A 転置有無
+            CUBLAS_OP_N,        // 行列B 転置有無
+            a_row,              // 行列Aの行数
+            b_row,              // 行列Bの列数
+            a_col,              // 行列Aの列数(=行列Ｂの行数)
+            &alpha,             // 行列の積に掛ける値(なければ1)
+            a.data().get(),     // 行列A
+            a_row,              // 行列Aの行数
+            b.data().get(),     // 行列B
+            b_row,              // 行列Bの行数
+            &beta,              // 行列Cに掛けるスカラ値(なければ0)
+            ret.data().get(),   // 行列Cの初期値 兼 出力先
+            ret.row()           // 行列Cの行数
+        );
     }
 
     return ret;
 }
-
-
 
 template<typename T>
 auto dot(mt::device_vector<T> &&a, bool T1 , mt::device_vector<T> &b, bool T2 ){
@@ -900,7 +879,7 @@ auto dot(mt::device_vector<T> &a, bool T1 , mt::device_vector<T> &b, bool T2 ){
 }
 
 
-/*  Cos */
+/* Cos */
 template<typename T>
 struct Cos_s
 {   
@@ -928,7 +907,7 @@ auto cos(mt::device_vector<T> &a){
     return ret;
 }
 
-/*  Sin */
+/* Sin */
 template<typename T>
 struct Sin_s
 {   
@@ -956,7 +935,7 @@ auto sin(mt::device_vector<T> &a){
 }
 
 
-/*  Tan */
+/* Tan */
 template<typename T>
 struct Tan_s
 {   
@@ -984,7 +963,7 @@ auto tan(mt::device_vector<T> &a){
 }
 
 
-/*  Exp */
+/* Exp */
 template<typename T>
 struct Exp_s
 {   
@@ -1012,7 +991,6 @@ auto exp(mt::device_vector<T> &a){
 }
 
 /* log */
-
 template<typename T>
 struct Log_s
 {   
@@ -1040,7 +1018,6 @@ auto log(mt::device_vector<T> &a){
 }
 
 /* sqrt */
-
 template<typename T>
 struct Sqrt_s
 {   
@@ -1066,7 +1043,6 @@ auto sqrt(mt::device_vector<T> &a){
     
     return ret;
 }
-
 
 /* pow */
 template<typename T, typename U>
@@ -1100,8 +1076,6 @@ auto pow(mt::device_vector<T> &a, U b){
     return ret;
 }
 
-
-
 /* resize */
 template<typename T>
 auto resize(mt::device_vector<T> &&a, int r, int c){
@@ -1113,17 +1087,13 @@ auto resize(mt::device_vector<T> &&a, int r, int c){
 
 }
 
-
 template<typename T>
 auto resize(mt::device_vector<T> &a, int r, int c){
     assert(a.size() == r*c);
     mt::device_vector<T> ret = resize(std::move(a), r, c);
     
     return ret;
-
 }
-
-
 
 struct rm2cm_idx_functor : public thrust::unary_function<int, int>
 {
@@ -1464,7 +1434,7 @@ T L1(mt::device_vector<T> &a){
 template<typename T>
 T L2(mt::device_vector<T> &&a){
 
-        //mt::device_vector<T> s;  /* Scalor */
+    //mt::device_vector<T> s;  /* Scalor */
     thrust::device_vector<T> s(1);
 
     if constexpr (std::is_same<T, float>{}) {
@@ -1534,20 +1504,12 @@ auto INV(mt::device_vector<T> &a){
     B.setRow(n);
     B.setCol(n);
 
-    print(B);
-
     cusolverStatus_t status;
     int worksize;
 
-    // dense LAPACK
-    cusolverDnHandle_t handle;
-
-    status = cusolverDnCreate(&handle);
-    assert( status == CUSOLVER_STATUS_SUCCESS );
-
     if constexpr (std::is_same<T, float>{}) {
         status = cusolverDnSgetrf_bufferSize(
-              handle,
+              g_handle2,
               n,                 // 行
               n,                 // 列
               A.data().get(),    // A
@@ -1563,7 +1525,7 @@ auto INV(mt::device_vector<T> &a){
         //std::cout << info[0]<< std::endl;
 
         status = cusolverDnSgetrf(
-              handle,
+              g_handle2,
               n,                         // 行
               n,                         // 列
               A.data().get(),            // A
@@ -1576,7 +1538,7 @@ auto INV(mt::device_vector<T> &a){
 
         assert( status == CUSOLVER_STATUS_SUCCESS );
         status = cusolverDnSgetrs(
-               handle,
+               g_handle2,
                CUBLAS_OP_N,
                n,                     // 行(=列)
                n,                     // 問題数
@@ -1592,7 +1554,7 @@ auto INV(mt::device_vector<T> &a){
     }else if constexpr (std::is_same<T, double>{}) {
 
         status = cusolverDnDgetrf_bufferSize(
-              handle,
+              g_handle2,
               n,                 // 行
               n,                 // 列
               A.data().get(),    // A
@@ -1608,7 +1570,7 @@ auto INV(mt::device_vector<T> &a){
         //std::cout << info[0]<< std::endl;
 
         status = cusolverDnDgetrf(
-              handle,
+              g_handle2,
               n,                         // 行
               n,                         // 列
               A.data().get(),            // A
@@ -1621,7 +1583,7 @@ auto INV(mt::device_vector<T> &a){
 
         assert( status == CUSOLVER_STATUS_SUCCESS );
         status = cusolverDnDgetrs(
-               handle,
+               g_handle2,
                CUBLAS_OP_N,
                n,                     // 行(=列)
                n,                     // 問題数
@@ -1636,7 +1598,7 @@ auto INV(mt::device_vector<T> &a){
 
     }
 
-    cusolverDnDestroy(handle);
+    //cusolverDnDestroy(handle);
 
     return B;
 }
@@ -1680,12 +1642,15 @@ auto rand(mt::device_vector<T> &a){
 }
 
 
-
-
 int main(){
 
 
-    cublasCreate(&g_handle);
+    cublasStatus_t status = cublasCreate(&g_handle);
+    assert( status == CUBLAS_STATUS_SUCCESS );
+
+    cusolverStatus_t status2 = cusolverDnCreate(&g_handle2);
+    assert( status2 == CUSOLVER_STATUS_SUCCESS );
+
     cublasSetPointerMode(g_handle,CUBLAS_POINTER_MODE_DEVICE); 
 
     thrust::host_vector<float> y1 = {5,-6};
@@ -1696,7 +1661,7 @@ int main(){
                                                              {9,16,3,4},
                                                              {2,0,1,0},
                                                              {1,3,2,1},
-                                                            };
+                                                        };
 
     mt::device_vector t1(h2);
     mt::device_vector t2(y2, VectorType::Col);
@@ -1719,8 +1684,6 @@ int main(){
     //auto a = p[0];
     //print(rand(p[0]*p[0]/2.0f -100.0f));
    
-
-
     //mt::device_vector<float> d1(z);
     
     //ThrustQueue<mt::device_vector<float>> q1;
@@ -1732,30 +1695,21 @@ int main(){
 
     //print(q1[0]);
 
-
     //print(*q1[0]);
-
-
 
     //ThrustQueue<ThrustQueue<mt::device_vector<float>*>*> q2;
 
     //q2.push(&q1); 
     
-
     //for(auto &a : q1){
     //    print(a);
-
     //}
-
 
     //mt::device_vector<float> d2(x);
 
     //auto p1 = cos(d2 / 100.0f); 
 
-
-
+    cusolverDnDestroy(g_handle2);
     cublasDestroy(g_handle);
-
-
 
 }
