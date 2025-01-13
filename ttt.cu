@@ -9,6 +9,7 @@
 #include <thrust/sequence.h>
 #include <thrust/gather.h>
 #include <thrust/reduce.h>
+#include <thrust/transform_reduce.h>
 #include <thrust/random.h>
 
 
@@ -245,7 +246,7 @@ void print(mt::device_vector<T>&& d)
     std::cout << "------" << std::endl;    
     thrust::host_vector<T> out(transpose(d, d.col(), d.row()));   
     for(int i=0; i<d.row(); ++i){
-        thrust::copy(out.begin() + d.col() * i, out.begin() + d.col() * (i + 1) , std::ostream_iterator<float>(std::cout, " ")); 
+        thrust::copy(out.begin() + d.col() * i, out.begin() + d.col() * (i + 1) , std::ostream_iterator<T>(std::cout, " ")); 
         std::cout << std::endl;
     }
 }
@@ -739,10 +740,17 @@ auto mDot(mt::device_vector<T> &a, mt::device_vector<T> &&b){
 }
 
 /* vector inner product */
+
 template<typename T>
 T vDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert(a.size() == b.size());
-    
+
+    auto c = a * b;
+    T ret = thrust::reduce(c.begin(), c.end(), 0.0, thrust::plus<T>());
+
+    return ret;
+
+#if 0
     cublasStatus_t status;
     //mt::device_vector<T> s;  /* Scalor */
     thrust::device_vector<T> s(1);
@@ -774,6 +782,8 @@ T vDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     assert( status == CUBLAS_STATUS_SUCCESS );
 
     return s.data()[0];
+#endif
+
 }
 
 
@@ -917,7 +927,12 @@ struct Cos_s
     __host__ __device__
     inline T operator()(T& a) const
     {      
-        return cosf(a);
+        if constexpr (std::is_same<T, float>{}) {
+            return cosf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return cos(a);
+        }
     }
 };
 
@@ -944,7 +959,12 @@ struct Sin_s
     __host__ __device__
     inline T operator()(T& a) const
     {      
-        return sinf(a);
+        if constexpr (std::is_same<T, float>{}) {
+            return sinf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return sin(a);
+        }
     }
 };
 
@@ -971,7 +991,12 @@ struct Tan_s
     __host__ __device__
     inline T operator()(T& a) const
     {      
-        return tanf(a);
+        if constexpr (std::is_same<T, float>{}) {
+            return tanf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return tan(a);
+        }
     }
 };
 
@@ -999,7 +1024,12 @@ struct Exp_s
     __host__ __device__
     inline T operator()(T& a) const
     {      
-        return expf(a);
+        if constexpr (std::is_same<T, float>{}) {
+            return expf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return exp(a);
+        }
     }
 };
 
@@ -1027,8 +1057,13 @@ struct Log_s
 
     __host__ __device__
     inline T operator()(T& a) const
-    {      
-        return logf(a);
+    {   
+        if constexpr (std::is_same<T, float>{}) {
+            return logf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return log(a);
+        } 
     }
 };
 
@@ -1057,7 +1092,12 @@ struct Sqrt_s
     __host__ __device__
     inline T operator()(T& a) const
     {      
-        return sqrtf(a);
+        if constexpr (std::is_same<T, float>{}) {
+            return sqrtf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return sqrt(a);
+        }
     }
 };
 
@@ -1089,7 +1129,12 @@ struct Pow_s
     __host__ __device__
     inline T operator()(T& a) const
     {      
-        return powf(a, val_);
+        if constexpr (std::is_same<T, float>{}) {
+            return powf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return pow(a);
+        }
     }
 };
 
@@ -1255,7 +1300,6 @@ auto TP(mt::device_vector<T> &a){
 
 
 /* reLU */
-
 template<typename T>
 struct Relu_s
 {   
@@ -1289,7 +1333,12 @@ struct Sig_s
     __host__ __device__
     inline T operator()(T& a) const
     {      
-        return 1/(1 + expf(-a));
+        if constexpr (std::is_same<T, float>{}) {
+            return 1/(1 + expf(-a));
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return 1/(1 + exp(-a));
+        }
     }
 };
 
@@ -1311,7 +1360,6 @@ auto sigmoid(mt::device_vector<T> &a){
 
 /* Summation Vertical direction */
 
-/*  Matrix dot */
 template <typename T>
 struct SumV_s
 {
@@ -1474,9 +1522,29 @@ auto sumH(mt::device_vector<T> &a){
 
 /* |a1| + |a2| + |a3| +   */
 template<typename T>
+struct Abs_s
+{   
+
+    __host__ __device__
+    inline T operator()(T a) const
+    {      
+        if constexpr (std::is_same<T, float>{}) {
+            return fabsf(a);
+        }
+        else  if constexpr (std::is_same<T, double>{}) {
+            return fabs(a);
+        }
+    }
+};
+
+template<typename T>
 T abs(mt::device_vector<T> &&a){
 
     //mt::device_vector<T> s;  /* Scalor */
+
+    T ret = thrust::transform_reduce(a.begin(), a.end(), Abs_s<T>(), 0.0, thrust::plus<T>());
+
+#if 0    
     thrust::device_vector<T> s(1);
     cublasStatus_t status;
 
@@ -1499,9 +1567,12 @@ T abs(mt::device_vector<T> &&a){
     }
 
     assert( status == CUBLAS_STATUS_SUCCESS );
-
     return s.data()[0];
 
+#endif
+
+    return ret;
+    
 }
 
 template<typename T>
@@ -1512,7 +1583,13 @@ T abs(mt::device_vector<T> &a){
 /* L1 */
 template<typename T>
 T L1(mt::device_vector<T> &&a){
-    return sqrtf(abs(a));
+
+    if constexpr (std::is_same<T, float>{}) {
+        return sqrtf(abs(a));
+    }else if constexpr (std::is_same<T, double>{}) {
+        return sqrt(abs(a));
+    }
+
 }
 
 template<typename T>
@@ -1520,11 +1597,41 @@ T L1(mt::device_vector<T> &a){
     return L1(std::move(a));
 }
 
+/* |a1|^2 + |a2|^2 + |a3|^2 +   */
+template<typename T>
+struct Square_s
+{   
+
+    __host__ __device__
+    inline T operator()(T a) const
+    {   
+        return a * a;   
+    }
+};
+
+template<typename T>
+T abs2(mt::device_vector<T> &&a){
+    //mt::device_vector<T> s;  /* Scalor */
+    T ret = thrust::transform_reduce(a.begin(), a.end(), Square_s<T>(), 0.0, thrust::plus<T>());
+    return ret;
+}
+
+template<typename T>
+T abs2(mt::device_vector<T> &a){
+    return abs2(std::move(a));
+}
 
 /* L2 */
 template<typename T>
 T L2(mt::device_vector<T> &&a){
 
+    if constexpr (std::is_same<T, float>{}) {
+        return sqrtf(abs2(a));
+    }else if constexpr (std::is_same<T, double>{}) {
+        return sqrt(abs2(a));
+    }
+
+#if 0
     //mt::device_vector<T> s;  /* Scalor */
     thrust::device_vector<T> s(1);
     cublasStatus_t status;
@@ -1550,6 +1657,7 @@ T L2(mt::device_vector<T> &&a){
     assert( status == CUBLAS_STATUS_SUCCESS );
 
     return s.data()[0];
+#endif
 
 }
 
@@ -1560,7 +1668,6 @@ T L2(mt::device_vector<T> &a){
 
 
 /* inverse matrix　*/
-
 template<typename T>
 struct One_s
 {   
@@ -1577,9 +1684,8 @@ struct One_s
     }
 };
 
-
 template<typename T>
-auto INV(mt::device_vector<T> &a){
+auto inv(mt::device_vector<T> &a){
     assert( a.col() == a.row() );
 
     int n = a.col();
@@ -1763,8 +1869,8 @@ int main(){
 
     cublasSetPointerMode(g_handle, CUBLAS_POINTER_MODE_DEVICE); 
 
-    thrust::host_vector<float> y1 = {5,-6};
-    thrust::host_vector<float> y2 = {7,4,3,3};      
+    thrust::host_vector<float> y1 = {5,-6,1,2,-3,4};
+    thrust::host_vector<float> y2 = {7,4,3,3,2,2};      
 
     thrust::host_vector<thrust::host_vector<float>> h1 = {
                                                              {1,4},
@@ -1787,14 +1893,17 @@ int main(){
 
 
     mt::device_vector t3(y1,VectorType::Row);
+    mt::device_vector t4(y2,VectorType::Row);
+
     mt::device_vector t1(h1);
     mt::device_vector t2(h2);
 
+    std::cout << L1(t3) << std::endl;;
     std::cout << L2(t3) << std::endl;;
 
-    print(t2);
+    print(cos(t2));
 
-    print(concatH(t1,t1));
+    std::cout << vDot(t3,t4) << std::endl;
 
     //print(rand(p[0]));
     //print(concatV(  p[0]*p[1]/2.0f -110.0f, p[0]*p[1]/2.0f - 100.0f));
