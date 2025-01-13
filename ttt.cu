@@ -12,7 +12,6 @@
 #include <thrust/transform_reduce.h>
 #include <thrust/random.h>
 
-
 namespace mt{
 template<typename T> class device_vector;
 };
@@ -255,6 +254,12 @@ template <typename T>
 void print(mt::device_vector<T>& d)
 {
     print(std::move(d));
+}
+
+template <typename T>
+void print(T d)
+{
+    std::cout << d << std::endl;
 }
 
 template <typename T>
@@ -915,7 +920,6 @@ auto dot(mt::device_vector<T> &a, bool T1 , mt::device_vector<T> &b, bool T2 ){
 template<typename T>
 struct Cos_s
 {   
-
     __host__ __device__
     inline T operator()(T& a) const
     {      
@@ -1863,10 +1867,10 @@ int main(){
     mt::device_vector t1(h1);
     mt::device_vector t2(h2);
 
-    std::cout << L1(t3) << std::endl;;
+    print( L1(t3) );;
     std::cout << L2(t3) << std::endl;;
 
-    print(tan(exp(cos(t2))));
+    print(5*sigmoid(10+tan(exp(cos(t2)-2)*2.3))/3);
 
     std::cout << vDot(t3,t4) << std::endl;
 
