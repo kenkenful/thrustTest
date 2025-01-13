@@ -495,7 +495,6 @@ auto operator*(mt::device_vector<T> &a, U b){
     return ret;
 }
 
-
 template <typename T , typename U>
 auto operator*(U a, mt::device_vector<T> &&b){
     mt::device_vector<T> ret(b);
@@ -559,7 +558,6 @@ auto operator/(mt::device_vector<T> &&a, mt::device_vector<T> &b){
 template <typename T>
 auto operator/(mt::device_vector<T> &a, mt::device_vector<T> &&b){
 
-
     mt::device_vector<T> ret = std::move(a) / std::move(b);
     return ret;
 }
@@ -616,7 +614,6 @@ struct div_s_2
     }
 };
 
-
 template <typename T, typename U>
 auto operator/(U a, mt::device_vector<T> &&b){
     mt::device_vector<T> ret(b);
@@ -631,7 +628,6 @@ auto operator/(U a, mt::device_vector<T> &b){
     mt::device_vector<T> ret = a / std::move(b);
     return ret;
 }
-
 
 /*  Matrix dot */
 template <typename T>
@@ -719,7 +715,6 @@ auto mDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     return ret;
 }
 
-
 template<typename T>
 auto mDot(mt::device_vector<T> &a, mt::device_vector<T> &b){
     mt::device_vector<T> ret = mDot(std::move(a), std::move(b));
@@ -785,7 +780,6 @@ T vDot(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
 #endif
 
 }
-
 
 template<typename T>
 auto vDot(mt::device_vector<T> &a, mt::device_vector<T> &&b){
@@ -909,7 +903,6 @@ auto dot(mt::device_vector<T> &a, bool T1 , mt::device_vector<T> &&b, bool T2 ){
 
 }
 
-
 template<typename T>
 auto dot(mt::device_vector<T> &a, bool T1 , mt::device_vector<T> &b, bool T2 ){
     mt::device_vector<T> ret = dot(std::move(a), T1, std::move(b), T2); 
@@ -917,7 +910,6 @@ auto dot(mt::device_vector<T> &a, bool T1 , mt::device_vector<T> &b, bool T2 ){
 
 }
 #endif
-
 
 /* Cos */
 template<typename T>
@@ -1015,7 +1007,6 @@ auto tan(mt::device_vector<T> &a){
     
     return ret;
 }
-
 
 /* Exp */
 template<typename T>
@@ -1201,7 +1192,6 @@ void copyMat(thrust::device_ptr<T> src, thrust::device_ptr<T> dst, unsigned src_
                 );
 }
 
-
 /* Concat Horizon */
 template<typename T>
 auto concatH(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
@@ -1231,14 +1221,12 @@ auto concatH(mt::device_vector<T> &a, mt::device_vector<T> &&b){
     return ret;
 }
 
-
 template<typename T>
 auto concatH(mt::device_vector<T> &a, mt::device_vector<T> &b){
     
     mt::device_vector<T> ret = concatH(std::move(a), std::move(b));
     return ret;
 }
-
 
 /* Concat Vertical */
 template<typename T>
@@ -1255,7 +1243,6 @@ auto concatV(mt::device_vector<T> &&a, mt::device_vector<T> &&b){
     return ret;
 }
 
-
 template<typename T>
 auto concatV(mt::device_vector<T> &a, mt::device_vector<T> &b){
    
@@ -1264,12 +1251,10 @@ auto concatV(mt::device_vector<T> &a, mt::device_vector<T> &b){
     return ret;
 }
 
-
 template<typename T>
 auto concatV(mt::device_vector<T> &&a, mt::device_vector<T> &b){
    
     mt::device_vector<T> ret = concatV(std::move(a), std::move(b));
-    
     return ret;
 }
 
@@ -1277,7 +1262,6 @@ template<typename T>
 auto concatV(mt::device_vector<T> &a, mt::device_vector<T> &&b){
    
     mt::device_vector<T> ret = concatV(std::move(a), std::move(b));
-    
     return ret;
 }
 
@@ -1297,7 +1281,6 @@ auto TP(mt::device_vector<T> &a){
     
     return ret;
 }
-
 
 /* reLU */
 template<typename T>
@@ -1359,7 +1342,6 @@ auto sigmoid(mt::device_vector<T> &a){
 }
 
 /* Summation Vertical direction */
-
 template <typename T>
 struct SumV_s
 {
@@ -1377,7 +1359,6 @@ struct SumV_s
         return sum;
     }
 };
-
 
 template <typename T>
 auto sumV(mt::device_vector<T> &&a){
@@ -1436,9 +1417,7 @@ auto sumV(mt::device_vector<T> &&a){
 
 template <typename T>
 auto sumV(mt::device_vector<T> &a){
-    
     return sumV(std::move(a));
-
 }
 
 /* Summation Horizontal direction */
@@ -1507,9 +1486,7 @@ auto sumH(mt::device_vector<T> &&a){
                         ret.data().get(), 
                         1
                     );
-
     }
-
 #endif
 
     return ret;
@@ -1524,7 +1501,6 @@ auto sumH(mt::device_vector<T> &a){
 template<typename T>
 struct Abs_s
 {   
-
     __host__ __device__
     inline T operator()(T a) const
     {      
@@ -1541,7 +1517,6 @@ template<typename T>
 T abs(mt::device_vector<T> &&a){
 
     //mt::device_vector<T> s;  /* Scalor */
-
     T ret = thrust::transform_reduce(a.begin(), a.end(), Abs_s<T>(), 0.0, thrust::plus<T>());
 
 #if 0    
@@ -1589,7 +1564,6 @@ T L1(mt::device_vector<T> &&a){
     }else if constexpr (std::is_same<T, double>{}) {
         return sqrt(abs(a));
     }
-
 }
 
 template<typename T>
@@ -1601,7 +1575,6 @@ T L1(mt::device_vector<T> &a){
 template<typename T>
 struct Square_s
 {   
-
     __host__ __device__
     inline T operator()(T a) const
     {   
@@ -1665,7 +1638,6 @@ template<typename T>
 T L2(mt::device_vector<T> &a){
     return L2(std::move(a));
 }
-
 
 /* inverse matrix　*/
 template<typename T>
@@ -1799,7 +1771,6 @@ auto inv(mt::device_vector<T> &a){
     return B;
 }
 
-
 /* RANDOM */
 template <typename T>
 struct Rand_s
@@ -1813,7 +1784,6 @@ struct Rand_s
         return uniDist(rng);
     }
 };
-
 
 template <typename T>
 auto rand(mt::device_vector<T> &&a){
@@ -1859,8 +1829,6 @@ auto rand(int r, int c){
 }
 
 int main(){
-
-
     cublasStatus_t status = cublasCreate(&g_handle);
     assert( status == CUBLAS_STATUS_SUCCESS );
 
@@ -1878,7 +1846,6 @@ int main(){
                                                             {19,116}
                                                         };
 
-
     thrust::host_vector<thrust::host_vector<float>> h2 = {
                                                              {1,4,5},
                                                              {9,16,1},
@@ -1890,8 +1857,6 @@ int main(){
                                                              {9,16,1},
                                                         };
 
-
-
     mt::device_vector t3(y1,VectorType::Row);
     mt::device_vector t4(y2,VectorType::Row);
 
@@ -1901,7 +1866,7 @@ int main(){
     std::cout << L1(t3) << std::endl;;
     std::cout << L2(t3) << std::endl;;
 
-    print(cos(t2));
+    print(tan(exp(cos(t2))));
 
     std::cout << vDot(t3,t4) << std::endl;
 
